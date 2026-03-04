@@ -1,0 +1,160 @@
+---
+title: Environment Variables
+description: Configure OfflineTube backend API URL and deployment settings
+---
+
+## Overview
+
+OfflineTube uses environment variables to configure the connection between the frontend and backend API. The primary configuration variable is `NEXT_PUBLIC_API_URL`, which determines how the frontend communicates with the FastAPI backend.
+
+## NEXT_PUBLIC_API_URL
+
+<ParamField path="NEXT_PUBLIC_API_URL" type="string" default="Auto-detected">
+  The base URL for the OfflineTube FastAPI backend. When set, the frontend will use this URL for all API requests.
+  
+  If not set, the frontend automatically resolves the API URL based on the current hostname and protocol.
+</ParamField>
+
+### Auto-Resolution Logic
+
+The frontend uses the following resolution strategy (from `src/app/page.tsx:19-30`):
+
+1. **Check environment variable**: If `NEXT_PUBLIC_API_URL` is set and not empty, use that value
+2. **Auto-detect from hostname**: If running in browser, construct URL as `{protocol}://{hostname}:8001`
+   - Uses `https` if current page is HTTPS, otherwise `http`
+   - Uses the current hostname (e.g., `192.168.1.100` or `localhost`)
+3. **Fallback**: Default to `http://localhost:8001`
+
+```typescript
+function resolveApiUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL;
+  if (fromEnv && fromEnv.trim().length > 0) return fromEnv;
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+    return `${protocol}://${host}:8001`;
+  }
+
+  return 'http://localhost:8001';
+}
+```
+
+## Configuration Examples
+
+### Local Development
+
+For local development, no environment variable is needed. The auto-detection works automatically:
+
+```bash
+# No .env.local needed
+npm run dev
+```
+
+The frontend at `http://localhost:3000` will automatically connect to `http://localhost:8001`.
+
+### Explicit Local Configuration
+
+To explicitly set the API URL, create a `.env.local` file:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8001
+```
+
+### LAN Access
+
+When accessing from other devices on your local network, **no configuration is needed**. The frontend automatically detects the hostname:
+
+```bash
+# Access from mobile device:
+# http://192.168.1.100:3000
+# Frontend auto-connects to: http://192.168.1.100:8001
+```
+
+### Custom Backend Location
+
+If your backend is on a different host or port:
+
+```env
+NEXT_PUBLIC_API_URL=http://192.168.1.50:8001
+```
+
+### Production Deployment
+
+For production with reverse proxy:
+
+```env
+NEXT_PUBLIC_API_URL=https://yourdomain.com/api
+```
+
+## Environment Variable Best Practices
+
+<Note>
+  Variables prefixed with `NEXT_PUBLIC_` are embedded in the frontend bundle at build time and exposed to the browser.
+</Note>
+
+### Development
+
+Use `.env.local` for local development (this file is gitignored):
+
+```bash
+# .env.local
+NEXT_PUBLIC_API_URL=http://localhost:8001
+```
+
+### Production Build
+
+Set environment variables before building:
+
+```bash
+export NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+npm run build
+```
+
+Or use a `.env.production` file:
+
+```env
+# .env.production
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+```
+
+## Verifying Configuration
+
+The resolved API URL is displayed in the Settings panel:
+
+1. Open OfflineTube
+2. Navigate to **Configuración** (Settings) tab
+3. Check the **API URL** field under **Conexión**
+4. The displayed URL shows the active backend connection
+
+## Troubleshooting
+
+<Warning>
+  If you see "API no disponible" errors, verify that:
+  - The backend is running on port 8001
+  - The `NEXT_PUBLIC_API_URL` matches your backend location
+  - Firewall allows connections on port 8001
+</Warning>
+
+### Common Issues
+
+**Frontend can't connect to backend**
+
+Check the browser console for the API URL being used:
+
+```javascript
+console.log(process.env.NEXT_PUBLIC_API_URL);
+```
+
+**Changes to .env.local not taking effect**
+
+Restart the Next.js dev server:
+
+```bash
+# Stop the server (Ctrl+C)
+npm run dev
+```
+
+**LAN access not working**
+
+Ensure the backend is bound to `0.0.0.0:8001` (not `127.0.0.1:8001`). The default configuration in `mini-services/offlinetube-api/main.py:682` already uses `0.0.0.0`.

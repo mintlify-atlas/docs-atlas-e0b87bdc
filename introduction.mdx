@@ -1,0 +1,99 @@
+---
+title: Introduction
+description: Learn about OfflineTube, a web application for downloading and watching YouTube videos offline with a YouTube-style interface
+---
+
+OfflineTube is a web application that allows you to search for YouTube videos, download them for offline use, and play them locally with a YouTube-style interface. The application provides a complete solution for managing your offline video library with features like quality selection, download management, and local streaming.
+
+## What is OfflineTube?
+
+OfflineTube bridges the gap between online video content and offline viewing. It combines the familiar YouTube browsing experience with powerful download capabilities and local playback features. Whether you want to save videos for offline viewing, create a local video library, or have reliable access to content without internet connectivity, OfflineTube provides the tools you need.
+
+## Architecture
+
+OfflineTube is built with a modern architecture that separates the frontend and backend concerns:
+
+```text
+Browser (UI)
+     │
+     ▼
+Next.js Frontend (port 3000)
+     │  HTTP
+     ▼
+FastAPI + yt-dlp (port 8001)
+     ├─ downloads/     (media files)
+     └─ thumbnails/    (local thumbnails)
+```
+
+### Frontend
+
+The frontend is built with **Next.js 16** using the App Router architecture. It provides:
+
+- Modern React-based user interface
+- Responsive design with dark/light mode support
+- Real-time download progress tracking
+- Local video player with streaming support
+- Search and discovery features
+
+### Backend
+
+The backend is powered by **FastAPI** and **yt-dlp**, running on port 8001. It handles:
+
+- Video information extraction and metadata
+- Download orchestration with quality selection
+- Local file storage and management
+- HTTP range request streaming for smooth playback
+- Thumbnail caching and optimization
+
+## Key features
+
+OfflineTube offers a comprehensive set of features for managing your offline video experience:
+
+<CardGroup cols={2}>
+  <Card title="Content exploration" icon="magnifying-glass">
+    Browse YouTube content through search and trending sections directly from the app
+  </Card>
+  
+  <Card title="Flexible downloads" icon="download">
+    Download videos or audio-only with quality and format selection options
+  </Card>
+  
+  <Card title="Offline library" icon="folder-open">
+    Manage your downloaded content with a local library and built-in media player
+  </Card>
+  
+  <Card title="Smooth streaming" icon="play">
+    Stream local files with HTTP range requests for seamless playback and seeking
+  </Card>
+  
+  <Card title="Download management" icon="list-check">
+    Track, cancel, delete, and retry download tasks with real-time progress updates
+  </Card>
+  
+  <Card title="Optimized thumbnails" icon="image">
+    Automatic thumbnail caching with fallback support for reliable preview images
+  </Card>
+  
+  <Card title="Responsive design" icon="mobile">
+    Modern interface that works across devices with adaptive layouts
+  </Card>
+  
+  <Card title="Theme support" icon="moon">
+    Switch between light and dark modes for comfortable viewing in any environment
+  </Card>
+</CardGroup>
+
+## Technology stack
+
+- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: FastAPI, Python 3.10+, yt-dlp, uvicorn
+- **Media Processing**: ffmpeg, ffprobe
+- **Storage**: Local file system for downloads and thumbnails
+
+## Get started
+
+Ready to set up OfflineTube? Check out the [quickstart guide](/quickstart) for a streamlined setup process, or dive into the detailed [installation instructions](/installation) for more control over your configuration.
+
+<Card title="Quickstart" icon="rocket" href="/quickstart">
+  Get OfflineTube running in minutes with our step-by-step quickstart guide
+</Card>

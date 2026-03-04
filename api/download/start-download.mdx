@@ -1,0 +1,75 @@
+---
+title: "Start Download"
+api: "POST /api/download"
+description: "Initiates a new video or audio download from a URL"
+---
+
+## Request Body
+
+<ParamField body="url" type="string" required>
+  The URL of the video to download (supports YouTube and other platforms via yt-dlp)
+</ParamField>
+
+<ParamField body="quality" type="string" default="720p">
+  The desired quality for video downloads (e.g., "720p", "1080p", "480p"). For audio downloads, this parameter is ignored.
+</ParamField>
+
+<ParamField body="download_type" type="string" default="video">
+  The type of download. Valid values:
+  - `"video"` - Download video with audio
+  - `"audio"` - Download audio only
+</ParamField>
+
+<ParamField body="format_id" type="string" default="">
+  Optional specific format ID from yt-dlp. If provided, this exact format will be downloaded. If empty, the best format matching the quality will be selected automatically.
+</ParamField>
+
+## Response
+
+<ResponseField name="download_id" type="string">
+  Unique identifier for the download task. Use this ID to check status, retrieve the file, or cancel the download.
+</ResponseField>
+
+<ResponseField name="id" type="string">
+  Alias for `download_id` (both fields return the same value)
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl -X POST https://your-api.com/api/download \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "quality": "1080p",
+    "download_type": "video"
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "download_id": "550e8400-e29b-41d4-a716-446655440000",
+  "id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## Download Process
+
+When you initiate a download:
+
+1. A unique `download_id` is generated
+2. The download task is added to the queue with status `"pending"`
+3. The download begins in the background
+4. The task progresses through statuses: `pending` → `downloading` → `processing` → `completed`
+5. Use the [List Downloads](/api/download/list-downloads) endpoint to monitor progress
+6. Once `status` is `"completed"`, retrieve the file using [Get File](/api/download/get-file)
+
+## Notes
+
+- The download happens asynchronously in the background
+- FFmpeg must be installed on the server for video processing
+- For video downloads, the output format is always MP4
+- Audio downloads support multiple formats (m4a, mp3, opus)
+- If the URL is a playlist, all videos will be downloaded

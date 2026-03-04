@@ -1,0 +1,206 @@
+---
+title: Authentication
+description: Authentication and security information for the OfflineTube API
+---
+
+## Current Authentication Status
+
+**The OfflineTube API currently has NO authentication implemented.**
+
+All API endpoints are publicly accessible without any form of authentication, authorization, or API keys.
+
+## Security Implications
+
+### Current State
+
+Since the API runs locally on `http://localhost:8001`, it is designed for:
+
+- **Local development** - Single-user access on your machine
+- **Personal use** - No external network exposure
+- **Trusted environment** - Behind your firewall
+
+### CORS Configuration
+
+The API is configured with fully open CORS:
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+This allows any web application running in a browser to access the API.
+
+## Production Considerations
+
+**WARNING:** If you plan to deploy this API to a production environment or make it accessible over a network, you MUST implement security measures.
+
+### Recommended Security Enhancements
+
+#### 1. API Key Authentication
+
+Implement API key-based authentication:
+
+```python
+from fastapi import Security, HTTPException
+from fastapi.security import APIKeyHeader
+
+API_KEY = "your-secret-api-key"
+api_key_header = APIKeyHeader(name="X-API-Key")
+
+def verify_api_key(api_key: str = Security(api_key_header)):
+    if api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API Key")
+    return api_key
+
+# Apply to endpoints
+@app.post("/api/download", dependencies=[Depends(verify_api_key)])
+async def start_download(...):
+    ...
+```
+
+#### 2. JWT Authentication
+
+For multi-user scenarios, implement JWT tokens:
+
+```python
+from fastapi import Depends
+from fastapi.security import HTTPBearer
+import jwt
+
+security = HTTPBearer()
+
+def verify_token(credentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return payload
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+```
+
+#### 3. Rate Limiting
+
+Prevent abuse with rate limiting:
+
+```python
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+@app.post("/api/download")
+@limiter.limit("5/minute")
+async def start_download(request: Request, ...):
+    ...
+```
+
+#### 4. Restrict CORS Origins
+
+Limit which domains can access your API:
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://yourdomain.com",
+        "https://app.yourdomain.com"
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+```
+
+#### 5. HTTPS/TLS
+
+Always use HTTPS in production:
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8001 \
+  --ssl-keyfile=./key.pem \
+  --ssl-certfile=./cert.pem
+```
+
+#### 6. Input Validation
+
+Validate and sanitize all user inputs to prevent:
+
+- URL injection attacks
+- Path traversal vulnerabilities
+- Command injection through yt-dlp
+
+#### 7. User Quotas
+
+Implement per-user download limits:
+
+- Maximum concurrent downloads
+- Daily download quota
+- Storage limits per user
+
+## File Access Security
+
+### Current Implementation
+
+Files are served directly from the filesystem:
+
+- `/api/download/{download_id}/file` - Direct file download
+- `/api/stream/{filename}` - File streaming
+- `/api/thumbnails/{task_id}` - Thumbnail access
+
+### Production Recommendations
+
+1. **Validate ownership** - Ensure users can only access their own files
+2. **Sanitize paths** - Prevent directory traversal attacks
+3. **Use signed URLs** - Temporary, expiring URLs for file access
+4. **Implement access logs** - Track who accesses what files
+
+```python
+import hmac
+import hashlib
+from datetime import datetime, timedelta
+
+def generate_signed_url(download_id: str, user_id: str, expires_in: int = 3600):
+    expires = int((datetime.now() + timedelta(seconds=expires_in)).timestamp())
+    message = f"{download_id}:{user_id}:{expires}"
+    signature = hmac.new(SECRET_KEY.encode(), message.encode(), hashlib.sha256).hexdigest()
+    return f"/api/download/{download_id}/file?expires={expires}&signature={signature}&user={user_id}"
+```
+
+## Network Exposure
+
+### Current Configuration
+
+The server binds to `0.0.0.0:8001`, making it accessible from:
+
+- Localhost (`127.0.0.1`)
+- Local network (if firewall allows)
+- Internet (if port-forwarded)
+
+### Recommendations
+
+**For local use only:**
+```python
+uvicorn.run(app, host="127.0.0.1", port=8001)
+```
+
+**For production with authentication:**
+```python
+uvicorn.run(app, host="0.0.0.0", port=8001)
+```
+
+## Summary
+
+The OfflineTube API is currently:
+
+- **Unauthenticated** - No login or API keys required
+- **Open CORS** - Accessible from any web application
+- **Local-first** - Designed for personal, local use
+- **Not production-ready** - Requires security hardening for deployment
+
+Implement the recommended security measures before exposing this API to untrusted networks or users.

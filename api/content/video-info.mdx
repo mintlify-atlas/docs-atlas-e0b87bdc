@@ -1,0 +1,248 @@
+---
+title: 'Video Information'
+api: 'POST /api/info'
+---
+
+Retrieve detailed information about a YouTube video, including all available download formats.
+
+## Request Body
+
+<ParamField body="url" type="string" required>
+  YouTube video URL to fetch information for
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  YouTube video ID
+</ResponseField>
+
+<ResponseField name="title" type="string">
+  Video title
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Full video description
+</ResponseField>
+
+<ResponseField name="thumbnail" type="string">
+  Thumbnail image URL
+</ResponseField>
+
+<ResponseField name="duration" type="integer">
+  Video duration in seconds
+</ResponseField>
+
+<ResponseField name="uploader" type="string">
+  Channel name or uploader name
+</ResponseField>
+
+<ResponseField name="uploader_url" type="string">
+  URL to the uploader's channel
+</ResponseField>
+
+<ResponseField name="view_count" type="integer">
+  Total number of views
+</ResponseField>
+
+<ResponseField name="like_count" type="integer">
+  Number of likes
+</ResponseField>
+
+<ResponseField name="upload_date" type="string">
+  Upload date in YYYYMMDD format
+</ResponseField>
+
+<ResponseField name="webpage_url" type="string">
+  Original webpage URL
+</ResponseField>
+
+<ResponseField name="is_playlist" type="boolean">
+  Whether the URL is a playlist
+</ResponseField>
+
+<ResponseField name="playlist_count" type="integer | null">
+  Number of videos in playlist (null if not a playlist)
+</ResponseField>
+
+<ResponseField name="subtitles" type="object">
+  Available subtitle tracks by language code
+</ResponseField>
+
+<ResponseField name="formats" type="array">
+  Array of all available download formats
+
+  <Expandable title="Format Object">
+    <ResponseField name="format_id" type="string">
+      Unique format identifier (used for download selection)
+    </ResponseField>
+
+    <ResponseField name="ext" type="string">
+      File extension (mp4, webm, m4a, etc.)
+    </ResponseField>
+
+    <ResponseField name="quality" type="string">
+      Human-readable quality (e.g., "1080p", "720p", "audio")
+    </ResponseField>
+
+    <ResponseField name="resolution" type="string">
+      Resolution in WIDTHxHEIGHT format
+    </ResponseField>
+
+    <ResponseField name="filesize" type="integer | null">
+      Exact file size in bytes (if available)
+    </ResponseField>
+
+    <ResponseField name="filesize_approx" type="string | null">
+      Approximate file size as string
+    </ResponseField>
+
+    <ResponseField name="vcodec" type="string">
+      Video codec (e.g., "avc1", "vp9", "none" for audio-only)
+    </ResponseField>
+
+    <ResponseField name="acodec" type="string">
+      Audio codec (e.g., "mp4a", "opus", "none" for video-only)
+    </ResponseField>
+
+    <ResponseField name="abr" type="number | null">
+      Audio bitrate in kbps
+    </ResponseField>
+
+    <ResponseField name="vbr" type="number | null">
+      Video bitrate in kbps
+    </ResponseField>
+
+    <ResponseField name="fps" type="number | null">
+      Frames per second
+    </ResponseField>
+
+    <ResponseField name="asr" type="integer | null">
+      Audio sample rate in Hz
+    </ResponseField>
+
+    <ResponseField name="audio_channels" type="integer | null">
+      Number of audio channels
+    </ResponseField>
+
+    <ResponseField name="format_note" type="string">
+      Additional format notes (e.g., "premium", "medium")
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example Request
+
+```bash
+curl -X POST "http://localhost:8001/api/info" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "id": "dQw4w9WgXcQ",
+  "title": "Example Video Title",
+  "description": "This is a detailed video description...",
+  "thumbnail": "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
+  "duration": 212,
+  "uploader": "Example Channel",
+  "uploader_url": "https://www.youtube.com/@ExampleChannel",
+  "view_count": 1000000000,
+  "like_count": 15000000,
+  "upload_date": "20091025",
+  "webpage_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "is_playlist": false,
+  "playlist_count": null,
+  "subtitles": {
+    "en": [
+      {
+        "ext": "vtt",
+        "url": "https://..."
+      }
+    ]
+  },
+  "formats": [
+    {
+      "format_id": "137",
+      "ext": "mp4",
+      "quality": "1080p",
+      "resolution": "1920x1080",
+      "filesize": 45678901,
+      "filesize_approx": null,
+      "vcodec": "avc1.640028",
+      "acodec": "none",
+      "abr": null,
+      "vbr": 2500,
+      "fps": 30,
+      "asr": null,
+      "audio_channels": null,
+      "format_note": "1080p"
+    },
+    {
+      "format_id": "136",
+      "ext": "mp4",
+      "quality": "720p",
+      "resolution": "1280x720",
+      "filesize": 23456789,
+      "filesize_approx": null,
+      "vcodec": "avc1.4d401f",
+      "acodec": "none",
+      "abr": null,
+      "vbr": 1500,
+      "fps": 30,
+      "asr": null,
+      "audio_channels": null,
+      "format_note": "720p"
+    },
+    {
+      "format_id": "140",
+      "ext": "m4a",
+      "quality": "audio",
+      "resolution": "",
+      "filesize": 3456789,
+      "filesize_approx": null,
+      "vcodec": "none",
+      "acodec": "mp4a.40.2",
+      "abr": 128,
+      "vbr": null,
+      "fps": null,
+      "asr": 44100,
+      "audio_channels": 2,
+      "format_note": "medium"
+    }
+  ]
+}
+```
+
+## Error Responses
+
+### 400 Bad Request
+
+Returned when the URL is missing or invalid.
+
+```json
+{
+  "detail": "URL requerida"
+}
+```
+
+```json
+{
+  "detail": "No se pudo obtener información: [error message]"
+}
+```
+
+## Implementation Notes
+
+- Uses yt-dlp to extract comprehensive video metadata
+- Returns all available formats (video-only, audio-only, and combined streams)
+- Format IDs can be used with the `/api/download` endpoint for specific quality selection
+- Video-only formats (acodec="none") require merging with audio during download
+- Audio-only formats (vcodec="none") are suitable for audio extraction
+- Supports both individual videos and playlists
+- Does not download content, only extracts metadata

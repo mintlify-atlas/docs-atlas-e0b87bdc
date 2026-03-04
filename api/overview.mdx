@@ -1,0 +1,125 @@
+---
+title: API Overview
+description: Complete overview of the OfflineTube API endpoints and capabilities
+---
+
+## Base URL
+
+The OfflineTube API runs locally on:
+
+```
+http://localhost:8001
+```
+
+## API Information
+
+- **Title:** YouTube Downloader Pro API
+- **Version:** 5.0.0
+- **Response Format:** JSON
+- **Server:** FastAPI with Uvicorn
+
+## Available Endpoint Categories
+
+### Download Management
+
+Manage video and audio downloads from YouTube:
+
+- `POST /api/download` - Start a new download task
+- `GET /api/downloads` - List all downloads with status
+- `GET /api/download/{download_id}/file` - Download the completed file
+- `DELETE /api/downloads/{download_id}` - Cancel a download
+- `DELETE /api/downloads/{download_id}/remove` - Remove download and delete file
+
+### Content Discovery
+
+Search and discover YouTube content:
+
+- `GET /api/search` - Search for videos by query or URL
+- `GET /api/trending` - Get trending videos
+- `POST /api/info` - Get detailed video information and available formats
+
+### Media Streaming
+
+Stream downloaded content:
+
+- `GET /api/stream/{filename}` - Stream video files with range request support
+- `GET /api/thumbnails/{task_id}` - Get video thumbnails
+
+## Response Format
+
+All API responses are returned in JSON format. Successful responses typically include:
+
+```json
+{
+  "id": "unique-task-id",
+  "title": "Video Title",
+  "status": "completed",
+  "progress": 100,
+  ...
+}
+```
+
+## Error Handling
+
+The API uses standard HTTP status codes:
+
+- **200** - Success
+- **206** - Partial Content (for range requests)
+- **400** - Bad Request (missing or invalid parameters)
+- **404** - Not Found (resource doesn't exist)
+- **500** - Internal Server Error
+
+Error responses include a detail message:
+
+```json
+{
+  "detail": "Error description"
+}
+```
+
+## Download Status Values
+
+Downloads progress through the following statuses:
+
+- `pending` - Download queued but not started
+- `downloading` - Actively downloading
+- `processing` - Converting/merging with FFmpeg
+- `completed` - Download finished successfully
+- `error` - Download failed (check error_message)
+- `cancelled` - Download was cancelled by user
+
+## CORS Configuration
+
+The API is configured with permissive CORS settings for local development:
+
+```python
+allow_origins=["*"]
+allow_credentials=True
+allow_methods=["*"]
+allow_headers=["*"]
+```
+
+**Note:** These settings should be restricted in production environments.
+
+## Dependencies
+
+The API requires:
+
+- **FFmpeg** - For video/audio processing and format conversion
+- **yt-dlp** - For downloading YouTube content
+- **FastAPI** - Web framework
+- **Uvicorn** - ASGI server
+
+## File Storage
+
+Downloaded files are stored in:
+
+- **Videos/Audio:** `./downloads/` directory
+- **Thumbnails:** `./thumbnails/` directory
+
+Files are named using the pattern: `{title}__{task_id}.{ext}`
+
+## Next Steps
+
+- [Authentication](/api/authentication) - Security and authentication details
+- Explore specific endpoint documentation for request/response schemas

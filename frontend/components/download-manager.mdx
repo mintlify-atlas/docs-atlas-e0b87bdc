@@ -1,0 +1,266 @@
+---
+title: DownloadManager
+description: Manage and monitor video/audio downloads with real-time progress tracking
+---
+
+## Overview
+
+The `DownloadManager` component provides a comprehensive interface for managing download tasks. It displays active, completed, and failed downloads with real-time progress updates, speed monitoring, and detailed download information.
+
+## Props
+
+<ParamField path="downloads" type="DownloadTask[]" required>
+  Array of download tasks to display. See [DownloadTask type](/frontend/types/downloader) for details.
+</ParamField>
+
+<ParamField path="onCancel" type="(id: string) => void" required>
+  Callback function called when a user cancels an active download.
+</ParamField>
+
+<ParamField path="onRemove" type="(id: string) => void" required>
+  Callback function called when a user removes a download from the list.
+</ParamField>
+
+<ParamField path="onRetry" type="(id: string) => void" required>
+  Callback function called when a user retries a failed download.
+</ParamField>
+
+<ParamField path="onDownloadFile" type="(id: string) => void" required>
+  Callback function called when a user downloads a completed file.
+</ParamField>
+
+<ParamField path="apiUrl" type="string" required>
+  Base URL of the backend API for resolving thumbnail URLs.
+</ParamField>
+
+## Features
+
+### Download Filtering
+
+Filter downloads by status using the built-in filter pills:
+- **All**: Show all downloads
+- **Active**: Only pending, downloading, and processing tasks
+- **Completed**: Only successfully completed downloads
+- **Error**: Only failed downloads
+
+### Real-time Progress Tracking
+
+- **Circular Progress**: Mini circular progress indicator on download cards
+- **Linear Progress Bar**: Detailed progress bar showing download and buffer status
+- **Speed Monitor**: Live download speed (e.g., "2.5 MB/s")
+- **ETA**: Estimated time remaining
+- **Byte Counter**: Downloaded bytes vs. total file size
+
+### Download States
+
+The component handles all download states:
+
+| Status | Description | Actions Available |
+|--------|-------------|-------------------|
+| `pending` | Queued, waiting to start | Cancel, Remove |
+| `downloading` | Actively downloading | Cancel, Remove |
+| `processing` | Post-download processing (e.g., merging audio+video) | Cancel, Remove |
+| `completed` | Successfully finished | Download, Remove |
+| `error` | Failed with error | Retry, Remove |
+| `cancelled` | User cancelled | Remove |
+
+### Detail Panel
+
+Click any download to open a detail panel showing:
+- Large circular progress indicator
+- Video thumbnail and title
+- Quality/format information
+- Detailed statistics (status, progress, speed, ETA, file size)
+- Start and completion timestamps
+- Error messages (if failed)
+- Quick action buttons
+
+### Theme Support
+
+Fully supports dark and light themes using the `useTheme` hook with dynamic class names.
+
+## Usage Example
+
+```tsx
+import { DownloadManager } from '@/components/downloader/DownloadManager';
+import type { DownloadTask } from '@/types/downloader';
+import { useState } from 'react';
+
+function DownloadsPage() {
+  const [downloads, setDownloads] = useState<DownloadTask[]>([
+    {
+      id: '1',
+      url: 'https://youtube.com/watch?v=abc123',
+      title: 'Amazing Tutorial Video',
+      status: 'downloading',
+      progress: 45.5,
+      speed: '3.2 MB/s',
+      eta: '2m 15s',
+      thumbnail: '/thumbnails/abc123.jpg',
+      format_note: '1080p (mp4)',
+      filesize: 157286400, // 150 MB
+      downloaded_bytes: 71557939, // ~68 MB
+      is_playlist: false,
+      playlist_index: 0,
+      playlist_total: 0,
+      quality: '1080p',
+      download_type: 'video',
+      created_at: '2024-01-15T10:30:00Z',
+    },
+  ]);
+
+  const handleCancel = (id: string) => {
+    // Cancel download via API
+    fetch(`/api/downloads/${id}/cancel`, { method: 'POST' });
+    setDownloads(prev => 
+      prev.map(d => d.id === id ? { ...d, status: 'cancelled' } : d)
+    );
+  };
+
+  const handleRemove = (id: string) => {
+    setDownloads(prev => prev.filter(d => d.id !== id));
+  };
+
+  const handleRetry = (id: string) => {
+    // Retry download via API
+    fetch(`/api/downloads/${id}/retry`, { method: 'POST' });
+  };
+
+  const handleDownloadFile = (id: string) => {
+    const download = downloads.find(d => d.id === id);
+    if (download?.filename) {
+      window.open(`/api/downloads/${id}/file`, '_blank');
+    }
+  };
+
+  return (
+    <div className="h-screen">
+      <DownloadManager
+        downloads={downloads}
+        onCancel={handleCancel}
+        onRemove={handleRemove}
+        onRetry={handleRetry}
+        onDownloadFile={handleDownloadFile}
+        apiUrl="http://localhost:8000"
+      />
+    </div>
+  );
+}
+```
+
+## WebSocket Integration
+
+For real-time updates, integrate with WebSocket to receive progress updates:
+
+```tsx
+import { useEffect } from 'react';
+
+function DownloadsPageWithWebSocket() {
+  const [downloads, setDownloads] = useState<DownloadTask[]>([]);
+
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8000/ws/downloads');
+
+    ws.onmessage = (event) => {
+      const update = JSON.parse(event.data);
+      
+      setDownloads(prev => {
+        const existing = prev.find(d => d.id === update.id);
+        if (existing) {
+          // Update existing download
+          return prev.map(d => d.id === update.id ? { ...d, ...update } : d);
+        } else {
+          // Add new download
+          return [...prev, update];
+        }
+      });
+    };
+
+    return () => ws.close();
+  }, []);
+
+  // ... rest of component
+}
+```
+
+## Responsive Design
+
+The component is fully responsive:
+- **Mobile**: Stacked layout with vertical scrolling
+- **Tablet**: Two-column layout when detail panel is open
+- **Desktop**: Side-by-side list and detail panels
+
+## Helper Functions
+
+The component includes useful utilities:
+
+### formatBytes
+
+Converts bytes to human-readable format:
+
+```tsx
+formatBytes(157286400) // "150.00 MB"
+formatBytes(1024) // "1.00 KB"
+```
+
+### formatDate
+
+Formats ISO date strings to localized format:
+
+```tsx
+formatDate('2024-01-15T10:30:00Z') // "15 ene, 10:30"
+```
+
+## Integration with YouTubeExplorer
+
+Combine with YouTubeExplorer for a complete download workflow:
+
+```tsx
+import { YouTubeExplorer } from '@/components/downloader/YouTubeExplorer';
+import { DownloadManager } from '@/components/downloader/DownloadManager';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+function DownloaderApp() {
+  const [downloads, setDownloads] = useState<DownloadTask[]>([]);
+
+  const handleDownload = async (url: string, options: DownloadOptions) => {
+    const response = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, ...options }),
+    });
+    const newTask = await response.json();
+    setDownloads(prev => [...prev, newTask]);
+  };
+
+  return (
+    <Tabs defaultValue="explorer">
+      <TabsList>
+        <TabsTrigger value="explorer">Explorer</TabsTrigger>
+        <TabsTrigger value="downloads">Downloads</TabsTrigger>
+      </TabsList>
+      <TabsContent value="explorer">
+        <YouTubeExplorer onDownload={handleDownload} apiUrl="http://localhost:8000" />
+      </TabsContent>
+      <TabsContent value="downloads">
+        <DownloadManager
+          downloads={downloads}
+          onCancel={handleCancel}
+          onRemove={handleRemove}
+          onRetry={handleRetry}
+          onDownloadFile={handleDownloadFile}
+          apiUrl="http://localhost:8000"
+        />
+      </TabsContent>
+    </Tabs>
+  );
+}
+```
+
+## Source Code Reference
+
+The DownloadManager component is located at:
+- `/workspace/source/src/components/downloader/DownloadManager.tsx:21-427`
+
+Related components:
+- `CircularProgress` component at `/workspace/source/src/components/downloader/CircularProgress.tsx`

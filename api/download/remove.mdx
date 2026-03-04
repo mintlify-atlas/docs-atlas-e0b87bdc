@@ -1,0 +1,115 @@
+---
+title: "Remove Download"
+api: "DELETE /api/downloads/{download_id}/remove"
+description: "Removes a download task from the list and deletes all associated files"
+---
+
+## Path Parameters
+
+<ParamField path="download_id" type="string" required>
+  The unique identifier of the download task to remove
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation message indicating the download was removed
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl -X DELETE https://your-api.com/api/downloads/550e8400-e29b-41d4-a716-446655440000/remove
+```
+
+```javascript JavaScript
+fetch('https://your-api.com/api/downloads/550e8400-e29b-41d4-a716-446655440000/remove', {
+  method: 'DELETE'
+})
+  .then(response => response.json())
+  .then(data => console.log(data.message));
+```
+
+```python Python
+import requests
+
+download_id = "550e8400-e29b-41d4-a716-446655440000"
+response = requests.delete(f"https://your-api.com/api/downloads/{download_id}/remove")
+print(response.json())
+```
+
+## Example Response
+
+```json
+{
+  "message": "Descarga eliminada"
+}
+```
+
+## Error Responses
+
+### 404 Not Found
+
+Returned when the `download_id` doesn't exist.
+
+```json
+{
+  "detail": "Descarga no encontrada"
+}
+```
+
+## Behavior
+
+This endpoint performs a complete cleanup:
+
+1. **Removes the task** from the in-memory downloads dictionary
+2. **Deletes the video/audio file** from the downloads directory (if it exists)
+3. **Deletes the thumbnail** from the thumbnails directory (checks for `.jpg`, `.webp`, and `.png` extensions)
+4. **Returns confirmation** message
+
+### Files Deleted
+
+```bash
+# Video/audio file
+/downloads/{title}__{download_id}.{ext}
+
+# Thumbnail files (all formats checked)
+/thumbnails/{download_id}.jpg
+/thumbnails/{download_id}.webp
+/thumbnails/{download_id}.png
+```
+
+## After Removal
+
+- The task will **no longer appear** in [GET /api/downloads](/api/download/list-downloads)
+- Attempting to access [GET /api/download/{download_id}/file](/api/download/get-file) will return 404
+- All disk space used by the download is freed
+
+## Cancel vs Remove
+
+| Action | Endpoint | Effect |
+|--------|----------|--------|
+| **Cancel** | `DELETE /api/downloads/{id}` | Stops the download, sets status to `"cancelled"`, keeps task in list |
+| **Remove** | `DELETE /api/downloads/{id}/remove` | Removes task from list and deletes all associated files |
+
+## Use Cases
+
+- **Free up disk space**: Remove completed downloads that are no longer needed
+- **Clean up failed downloads**: Remove tasks with status `"error"`
+- **Clear download history**: Remove old downloads from the list
+- **Delete unwanted files**: Remove downloads that were completed but no longer wanted
+
+## Error Handling
+
+The endpoint uses `missing_ok=True` when deleting files, so it won't fail if:
+- The video/audio file doesn't exist
+- The thumbnail file doesn't exist
+- Files were already manually deleted
+
+```python
+# From source code
+(DOWNLOAD_DIR / task.filename).unlink(missing_ok=True)
+(THUMBNAILS_DIR / f"{download_id}.{ext}").unlink(missing_ok=True)
+```
+
+This ensures the task is always removed from the list even if file deletion fails.

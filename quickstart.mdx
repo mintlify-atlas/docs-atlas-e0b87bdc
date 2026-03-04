@@ -1,80 +1,163 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get OfflineTube up and running in minutes with this step-by-step guide
 ---
 
-## Get started in three steps
+This quickstart guide will help you get OfflineTube running on your local machine quickly. You'll install dependencies, start both the frontend and backend servers, and download your first video.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, ensure you have the following installed on your system:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+<CardGroup cols={3}>
+  <Card title="Node.js 20+" icon="node-js">
+    JavaScript runtime for the frontend
+  </Card>
+  <Card title="Python 3.10+" icon="python">
+    Backend API runtime environment
+  </Card>
+  <Card title="ffmpeg" icon="video">
+    Media processing toolkit (must be in PATH)
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+Verify ffmpeg is installed by running `ffmpeg -version` and `ffprobe -version` in your terminal.
 </Note>
+
+## Installation
+
+<Steps>
+  <Step title="Clone or navigate to the project">
+    Navigate to your OfflineTube source directory:
+    
+    ```bash
+    cd /path/to/offlinetube
+    ```
+  </Step>
+
+  <Step title="Install frontend dependencies">
+    Install the Node.js packages using npm:
+    
+    ```bash
+    npm install
+    ```
+    
+    This will install Next.js, React, and all required frontend dependencies from `package.json`.
+  </Step>
+
+  <Step title="Set up the backend">
+    Create a Python virtual environment and install backend dependencies:
+    
+    ```bash
+    cd mini-services/offlinetube-api
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    ```
+    
+    <Note>
+    On Windows, use `.venv\Scripts\activate` instead of `source .venv/bin/activate`
+    </Note>
+  </Step>
+
+  <Step title="Start the backend server">
+    From the `mini-services/offlinetube-api` directory with your virtual environment activated:
+    
+    ```bash
+    python main.py
+    ```
+    
+    The backend will start on `http://0.0.0.0:8001`. You should see:
+    
+    ```
+    INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+    ```
+  </Step>
+
+  <Step title="Start the frontend server">
+    Open a new terminal window, navigate to the project root, and start the frontend:
+    
+    ```bash
+    npm run dev
+    ```
+    
+    The frontend will start on `http://localhost:3000`.
+  </Step>
+
+  <Step title="Access the application">
+    Open your browser and navigate to:
+    
+    ```
+    http://localhost:3000
+    ```
+    
+    You should see the OfflineTube interface ready to use.
+  </Step>
+</Steps>
+
+## Your first download
+
+Now that OfflineTube is running, let's download your first video:
+
+<Steps>
+  <Step title="Search for content">
+    Use the search bar in the OfflineTube interface to find a video, or browse trending content.
+  </Step>
+
+  <Step title="Select quality and format">
+    Click on a video to view its details. You'll see options to:
+    
+    - Choose between video or audio-only download
+    - Select quality (e.g., 720p, 1080p, 480p)
+    - Pick specific formats if available
+  </Step>
+
+  <Step title="Start the download">
+    Click the download button to begin. You'll see:
+    
+    - Real-time progress percentage
+    - Download speed
+    - Estimated time remaining
+    - File size information
+  </Step>
+
+  <Step title="Watch offline">
+    Once complete, your video appears in the offline library. Click to play it locally with the built-in player.
+    
+    <Note>
+    Downloaded files are stored in `mini-services/offlinetube-api/downloads/`
+    </Note>
+  </Step>
+</Steps>
+
+## Quick tips
+
+<Tip>
+**Network access**: The frontend automatically detects the backend URL. If accessing from another device on your LAN, visit `http://YOUR_IP:3000` and it will connect to `http://YOUR_IP:8001` automatically.
+</Tip>
+
+<Warning>
+**Backend must run first**: Always start the backend (port 8001) before the frontend (port 3000) to ensure proper API connectivity.
+</Warning>
+
+## Troubleshooting
+
+If you encounter issues:
+
+- **"Failed to fetch" errors**: Verify the backend is running on port 8001 and check firewall settings
+- **FFmpeg errors**: Ensure ffmpeg and ffprobe are installed and available in your system PATH
+- **No thumbnails**: Thumbnails use remote fallbacks automatically, but local caching may take a moment
+- **Missing audio**: The backend validates audio tracks; if a download lacks audio, it will be marked as an error
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Detailed installation" icon="book" href="/installation">
+    Learn about environment variables, system requirements, and advanced configuration
+  </Card>
+  
+  <Card title="API reference" icon="code" href="/api/overview">
+    Explore the backend API endpoints for integration and automation
+  </Card>
+</CardGroup>

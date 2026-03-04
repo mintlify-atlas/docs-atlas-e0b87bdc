@@ -1,0 +1,108 @@
+---
+title: "Get File"
+api: "GET /api/download/{download_id}/file"
+description: "Downloads the completed video or audio file"
+---
+
+## Path Parameters
+
+<ParamField path="download_id" type="string" required>
+  The unique identifier of the download task (returned from [Start Download](/api/download/start-download))
+</ParamField>
+
+## Response
+
+Returns the raw file data with appropriate headers for file download.
+
+**Response Type**: Binary file (video/audio)
+
+**Headers**:
+- `Content-Disposition`: Includes the original filename
+- `Content-Type`: Determined by file extension (e.g., `video/mp4`, `audio/m4a`)
+
+## Example Request
+
+```bash cURL
+curl -O -J https://your-api.com/api/download/550e8400-e29b-41d4-a716-446655440000/file
+```
+
+```bash wget
+wget --content-disposition https://your-api.com/api/download/550e8400-e29b-41d4-a716-446655440000/file
+```
+
+```javascript JavaScript
+fetch('https://your-api.com/api/download/550e8400-e29b-41d4-a716-446655440000/file')
+  .then(response => {
+    const filename = response.headers.get('content-disposition')
+      .split('filename=')[1]
+      .replace(/"/g, '');
+    return response.blob().then(blob => ({ blob, filename }));
+  })
+  .then(({ blob, filename }) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+  });
+```
+
+## Error Responses
+
+<ResponseField name="detail" type="string">
+  Error message describing why the file cannot be retrieved
+</ResponseField>
+
+### 404 Not Found
+
+Returned when:
+- The `download_id` doesn't exist
+- The download hasn't completed yet (status is not `"completed"`)
+- The physical file was deleted from disk
+
+```json
+{
+  "detail": "Descarga no disponible o no completada"
+}
+```
+
+```json
+{
+  "detail": "Archivo físico no encontrado"
+}
+```
+
+## Usage Flow
+
+1. Start a download using [POST /api/download](/api/download/start-download)
+2. Poll [GET /api/downloads](/api/download/list-downloads) until status is `"completed"`
+3. Call this endpoint to retrieve the file
+
+```bash Complete Example
+# Step 1: Start download
+DOWNLOAD_ID=$(curl -X POST https://your-api.com/api/download \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "quality": "720p"}' \
+  | jq -r '.download_id')
+
+echo "Download ID: $DOWNLOAD_ID"
+
+# Step 2: Wait for completion
+while true; do
+  STATUS=$(curl -s https://your-api.com/api/downloads | jq -r ".[] | select(.id==\"$DOWNLOAD_ID\") | .status")
+  echo "Status: $STATUS"
+  if [ "$STATUS" = "completed" ]; then
+    break
+  fi
+  sleep 2
+done
+
+# Step 3: Download the file
+curl -O -J https://your-api.com/api/download/$DOWNLOAD_ID/file
+```
+
+## Notes
+
+- Files are served directly from disk using FastAPI's `FileResponse`
+- The filename in the `Content-Disposition` header matches the original video title
+- Files remain on the server until explicitly removed with [DELETE /api/downloads/{download_id}/remove](/api/download/remove)

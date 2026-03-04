@@ -1,0 +1,336 @@
+---
+title: Network Access
+description: Configure OfflineTube for LAN access and multi-device usage
+---
+
+## Overview
+
+OfflineTube can be accessed from any device on your local network (LAN). This allows you to run the server on one machine and access it from phones, tablets, or other computers.
+
+## Default Configuration
+
+OfflineTube is configured for network access out of the box:
+
+- **Backend**: Binds to `0.0.0.0:8001` (accessible from any network interface)
+- **Frontend**: Auto-detects the hostname and connects to `{hostname}:8001`
+
+<Note>
+  No configuration changes are needed for basic LAN access. The defaults work automatically.
+</Note>
+
+## Backend Configuration
+
+The FastAPI backend is configured to accept connections from any network interface.
+
+### Host Binding
+
+From `mini-services/offlinetube-api/main.py:682`:
+
+```python
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)
+```
+
+<ParamField path="host" type="string" default="0.0.0.0">
+  The network interface the backend binds to.
+  
+  **Options:**
+  - `0.0.0.0` - Listen on all network interfaces (LAN access enabled)
+  - `127.0.0.1` - Listen only on localhost (LAN access disabled)
+</ParamField>
+
+<ParamField path="port" type="number" default="8001">
+  The port the FastAPI backend listens on.
+</ParamField>
+
+### Why 0.0.0.0?
+
+Binding to `0.0.0.0` means the backend accepts connections on:
+
+- `localhost` (127.0.0.1)
+- LAN IP address (e.g., 192.168.1.100)
+- Any other network interface
+
+<Warning>
+  **Security Note**: `0.0.0.0` makes the backend accessible from your entire local network. Only use this on trusted networks. For internet-facing deployments, use a reverse proxy with authentication.
+</Warning>
+
+## Frontend Configuration
+
+The Next.js frontend automatically adapts to the access method.
+
+### Auto-Detection
+
+When you access the frontend from a device, it automatically uses that device's hostname to connect to the backend.
+
+**Example flow:**
+
+1. Server machine IP: `192.168.1.100`
+2. Access from phone: `http://192.168.1.100:3000`
+3. Frontend auto-connects to: `http://192.168.1.100:8001`
+
+From `src/app/page.tsx:19-30`:
+
+```typescript
+function resolveApiUrl(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL;
+  if (fromEnv && fromEnv.trim().length > 0) return fromEnv;
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;  // e.g., "192.168.1.100"
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+    return `${protocol}://${host}:8001`;   // http://192.168.1.100:8001
+  }
+
+  return 'http://localhost:8001';
+}
+```
+
+### Manual Override
+
+If auto-detection doesn't work for your setup, manually set the backend URL:
+
+```env
+# .env.local
+NEXT_PUBLIC_API_URL=http://192.168.1.100:8001
+```
+
+## Network Setup Guide
+
+### Step 1: Start the Backend
+
+On the server machine, start the FastAPI backend:
+
+```bash
+cd mini-services/offlinetube-api
+source .venv/bin/activate
+python main.py
+```
+
+You should see:
+
+```
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+```
+
+### Step 2: Start the Frontend
+
+On the same machine, start the Next.js frontend:
+
+```bash
+npm run dev
+```
+
+You should see:
+
+```
+- Local:        http://localhost:3000
+- Network:      http://192.168.1.100:3000
+```
+
+<Tip>
+  Note the **Network** URL - this is what you'll use from other devices.
+</Tip>
+
+### Step 3: Find Server IP Address
+
+If the Network URL isn't displayed, find your IP manually:
+
+**Linux/Mac:**
+```bash
+ip addr show | grep "inet " | grep -v 127.0.0.1
+# or
+ifconfig | grep "inet " | grep -v 127.0.0.1
+```
+
+**Windows:**
+```bash
+ipconfig | findstr IPv4
+```
+
+Example output: `192.168.1.100`
+
+### Step 4: Access from Other Devices
+
+On your phone, tablet, or other computer:
+
+1. Ensure the device is on the same WiFi/LAN as the server
+2. Open a browser
+3. Navigate to `http://192.168.1.100:3000` (use your server's IP)
+
+## Firewall Configuration
+
+### Linux (UFW)
+
+Allow incoming connections on ports 3000 and 8001:
+
+```bash
+sudo ufw allow 3000/tcp
+sudo ufw allow 8001/tcp
+sudo ufw reload
+```
+
+### Linux (firewalld)
+
+```bash
+sudo firewall-cmd --permanent --add-port=3000/tcp
+sudo firewall-cmd --permanent --add-port=8001/tcp
+sudo firewall-cmd --reload
+```
+
+### macOS
+
+macOS typically allows local network connections by default. If issues occur:
+
+1. Open **System Preferences** → **Security & Privacy** → **Firewall**
+2. Click **Firewall Options**
+3. Ensure Node.js and Python are allowed
+
+### Windows Firewall
+
+Create inbound rules for ports 3000 and 8001:
+
+```powershell
+New-NetFirewallRule -DisplayName "OfflineTube Frontend" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "OfflineTube Backend" -Direction Inbound -LocalPort 8001 -Protocol TCP -Action Allow
+```
+
+Or use the GUI:
+
+1. Open **Windows Defender Firewall** → **Advanced Settings**
+2. Click **Inbound Rules** → **New Rule**
+3. Select **Port** → **TCP** → Enter `3000, 8001`
+4. **Allow the connection** → Name it "OfflineTube"
+
+## Troubleshooting
+
+### Can't Access from Other Devices
+
+**Check network connectivity:**
+```bash
+# From the client device, ping the server
+ping 192.168.1.100
+```
+
+**Verify backend is listening on all interfaces:**
+```bash
+# On server machine
+sudo netstat -tlnp | grep 8001
+# Should show: 0.0.0.0:8001 (not 127.0.0.1:8001)
+```
+
+**Check firewall status:**
+```bash
+# Linux (UFW)
+sudo ufw status
+
+# Linux (firewalld)
+sudo firewall-cmd --list-ports
+```
+
+### Backend Shows 127.0.0.1 Instead of 0.0.0.0
+
+If you modified the backend startup, ensure you're using `0.0.0.0`:
+
+```python
+# Correct (allows LAN access)
+uvicorn.run(app, host="0.0.0.0", port=8001)
+
+# Wrong (localhost only)
+uvicorn.run(app, host="127.0.0.1", port=8001)
+```
+
+### Frontend Connects to Wrong Backend
+
+Check the Settings panel to see which API URL is being used:
+
+1. Open OfflineTube
+2. Navigate to **Configuración** tab
+3. Check **API URL** under **Conexión**
+
+If incorrect, set `NEXT_PUBLIC_API_URL` explicitly:
+
+```env
+NEXT_PUBLIC_API_URL=http://192.168.1.100:8001
+```
+
+### CORS Errors in Browser Console
+
+The backend is configured to allow all origins by default (`main.py:80-86`):
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+If you see CORS errors, ensure:
+- Backend is actually running
+- No proxy/VPN is interfering
+- Browser console shows the correct API URL
+
+## Production Deployment
+
+For production use with internet access, use a reverse proxy.
+
+### Nginx Example
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    # Frontend
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Backend API
+    location /api/ {
+        proxy_pass http://localhost:8001/api/;
+        proxy_http_version 1.1;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+    }
+}
+```
+
+Then set:
+
+```env
+NEXT_PUBLIC_API_URL=https://yourdomain.com/api
+```
+
+<Warning>
+  For internet-facing deployments, implement authentication and use HTTPS. OfflineTube has no built-in authentication.
+</Warning>
+
+## Network Performance Tips
+
+<Tip>
+  For best performance on LAN:
+  - Use wired Ethernet instead of WiFi when possible
+  - Ensure router supports Gigabit speeds for 4K video streaming
+  - Download videos on the server machine to avoid network bottlenecks during download
+</Tip>
+
+### Bandwidth Requirements
+
+| Activity | Minimum Speed | Recommended Speed |
+|----------|--------------|-------------------|
+| 720p streaming | 5 Mbps | 10 Mbps |
+| 1080p streaming | 10 Mbps | 25 Mbps |
+| 4K streaming | 25 Mbps | 50+ Mbps |
+| Downloading | N/A | Depends on internet |
+
+Note: These are LAN speeds, not internet speeds. Most modern routers provide 100+ Mbps on LAN.

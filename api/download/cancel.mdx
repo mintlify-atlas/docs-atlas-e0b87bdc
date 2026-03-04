@@ -1,0 +1,93 @@
+---
+title: "Cancel Download"
+api: "DELETE /api/downloads/{download_id}"
+description: "Cancels an in-progress download task"
+---
+
+## Path Parameters
+
+<ParamField path="download_id" type="string" required>
+  The unique identifier of the download task to cancel
+</ParamField>
+
+## Response
+
+<ResponseField name="message" type="string">
+  Confirmation message indicating the download was cancelled
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl -X DELETE https://your-api.com/api/downloads/550e8400-e29b-41d4-a716-446655440000
+```
+
+```javascript JavaScript
+fetch('https://your-api.com/api/downloads/550e8400-e29b-41d4-a716-446655440000', {
+  method: 'DELETE'
+})
+  .then(response => response.json())
+  .then(data => console.log(data.message));
+```
+
+```python Python
+import requests
+
+download_id = "550e8400-e29b-41d4-a716-446655440000"
+response = requests.delete(f"https://your-api.com/api/downloads/{download_id}")
+print(response.json())
+```
+
+## Example Response
+
+```json
+{
+  "message": "Descarga cancelada"
+}
+```
+
+## Error Responses
+
+### 404 Not Found
+
+Returned when the `download_id` doesn't exist.
+
+```json
+{
+  "detail": "Descarga no encontrada"
+}
+```
+
+## Behavior
+
+- Sets the download task status to `"cancelled"`
+- The task remains in the downloads list (visible via [GET /api/downloads](/api/download/list-downloads))
+- The download process will stop, but any partial files may remain on disk
+- To fully remove the task and clean up files, use [DELETE /api/downloads/{download_id}/remove](/api/download/remove)
+
+## Status Updates
+
+After cancellation, querying [GET /api/downloads](/api/download/list-downloads) will show:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "cancelled",
+  "progress": 45.5,
+  // ... other fields
+}
+```
+
+## Cancel vs Remove
+
+| Action | Endpoint | Effect |
+|--------|----------|--------|
+| **Cancel** | `DELETE /api/downloads/{id}` | Stops the download, sets status to `"cancelled"`, keeps task in list |
+| **Remove** | `DELETE /api/downloads/{id}/remove` | Removes task from list and deletes all associated files |
+
+## Use Cases
+
+- User clicks "Cancel" button during download
+- Download is taking too long and user wants to start over
+- Need to free up bandwidth for other downloads
+- Wrong video was selected and needs to be stopped

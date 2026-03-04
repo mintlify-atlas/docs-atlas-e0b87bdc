@@ -1,0 +1,352 @@
+---
+title: Offline Playback
+description: Watch your downloaded videos offline with a full-featured HTML5 video player
+---
+
+## Overview
+
+Once videos are downloaded, OfflineTube provides a seamless offline playback experience using the browser's native HTML5 video player with streaming support. No internet connection required after download.
+
+## Accessing Your Videos
+
+### Video Library
+
+All completed downloads appear in the **Offline** tab (the default view):
+
+1. Thumbnails are displayed in a responsive grid
+2. Click any video card to start playback
+3. Videos load instantly from local storage
+
+```typescript
+// From page.tsx:440-484
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-6">
+  {filteredLibrary.map((d) => {
+    const vid: Video = {
+      id: d.id,
+      title: d.title || 'Descarga',
+      thumbnail: resolveThumbnail(d.thumbnail || '', API_URL),
+      videoUrl: d.filename
+        ? `${API_URL}/api/stream/${encodeURIComponent(d.filename)}`
+        : `${API_URL}/api/download/${d.id}/file`,
+      // ... other properties
+    };
+    
+    return (
+      <VideoCard
+        key={d.id}
+        video={vid}
+        onClick={() => {
+          handleVideoClick(vid);
+          setViewMode('watch');
+        }}
+      />
+    );
+  })}
+</div>
+```
+
+### Grid Layout
+
+The library adapts to your screen size:
+- **Mobile**: 1 column
+- **Tablet**: 2-3 columns
+- **Desktop**: 4 columns
+- **Large displays**: 5 columns
+
+## Video Player
+
+### HTML5 Player
+
+OfflineTube uses the VideoPlayer component with native browser controls:
+
+```typescript
+// From VideoPlayer.tsx (referenced in page.tsx:551)
+<VideoPlayer video={selectedVideo} />
+```
+
+The player provides:
+- Play/pause controls
+- Volume control
+- Fullscreen mode
+- Seek/scrub timeline
+- Picture-in-picture (browser-dependent)
+- Keyboard shortcuts (space to play/pause, arrow keys to seek)
+
+### Streaming Backend
+
+Videos are served with HTTP range request support for smooth playback:
+
+```python
+# From main.py:497-533
+@app.get("/api/stream/{filename}")
+async def stream_file(filename: str, request: Request):
+    filepath = DOWNLOAD_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(404, "Archivo no encontrado")
+    
+    file_size = filepath.stat().st_size
+    range_header = request.headers.get("range")
+    
+    if range_header:
+        match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        if match:
+            start = int(match.group(1))
+            end = int(match.group(2)) if match.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+            chunk_size = end - start + 1
+            
+            def iterfile():
+                with open(filepath, "rb") as f:
+                    f.seek(start)
+                    remaining = chunk_size
+                    while remaining > 0:
+                        data = f.read(min(65536, remaining))
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+            
+            headers = {
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(chunk_size),
+                "Content-Type": "video/mp4",
+            }
+            return StreamingResponse(iterfile(), status_code=206, headers=headers)
+    
+    return FileResponse(filepath, media_type="video/mp4")
+```
+
+<Info>
+  **Range requests** allow the browser to:
+  - Seek to any point in the video instantly
+  - Load only necessary chunks (saves bandwidth)
+  - Resume playback after network interruption
+</Info>
+
+## Video Information Display
+
+The VideoInfo component shows metadata below the player:
+
+```typescript
+// From page.tsx:552
+<VideoInfo video={selectedVideo} />
+```
+
+Displays:
+- Full video title
+- Upload date and view count (if available)
+- Video description
+- Channel information
+- Quality/format details
+
+## Navigation
+
+### Back to Library
+
+Return to the video grid with the back button:
+
+```typescript
+// From page.tsx:508-516
+<Button
+  variant="ghost"
+  className="text-white hover:bg-[#272727]"
+  onClick={handleBackToHome}
+>
+  <ArrowLeft className="h-4 w-4 mr-2" />
+  Volver a biblioteca
+</Button>
+```
+
+### View Mode State
+
+```typescript
+// From page.tsx:44
+const [viewMode, setViewMode] = useState<ViewMode>('offline');
+
+// From page.tsx:126-133
+const handleVideoClick = useCallback(
+  (video: Video) => {
+    setSelectedVideo(video);
+    setViewMode('watch');
+    window.scrollTo(0, 0);
+  },
+  []
+);
+```
+
+## Thumbnail Handling
+
+### Thumbnail Storage
+
+Thumbnails are saved locally during download:
+
+```python
+# From main.py:161-174
+def _ensure_local_thumbnail(task: "DownloadTask") -> None:
+    # 1) If yt-dlp wrote one in download dir, move it.
+    if _save_local_thumbnail(task.id):
+        return
+    # 2) Try task thumbnail URL.
+    if task.thumbnail and task.thumbnail.startswith("http"):
+        if _download_thumbnail(task.id, task.thumbnail):
+            return
+    # 3) Fallback stable ytimg URL from video id.
+    vid_id = _extract_ytid(task.url)
+    if vid_id:
+        _download_thumbnail(task.id, _ytimg_url(vid_id))
+```
+
+### Thumbnail Endpoint
+
+```python
+# From main.py:540-546
+@app.get("/api/thumbnails/{task_id}")
+async def get_thumbnail(task_id: str):
+    for ext in ("jpg", "webp", "png"):
+        thumb = THUMBNAILS_DIR / f"{task_id}.{ext}"
+        if thumb.exists():
+            return FileResponse(thumb, media_type=f"image/{ext}")
+    raise HTTPException(404, "Miniatura no encontrada")
+```
+
+### Resolving Thumbnail URLs
+
+```typescript
+// From page.tsx:32-37
+function resolveThumbnail(thumb: string, apiUrl: string): string {
+  if (!thumb) return '';
+  if (thumb.startsWith('/')) return `${apiUrl}${thumb}`;
+  return thumb;
+}
+```
+
+## Online Preview Mode
+
+OfflineTube also supports playing videos online via YouTube embed:
+
+```typescript
+// From page.tsx:505-534
+{viewMode === 'watch' && onlineVideo && (
+  <div className="max-w-[1800px] mx-auto">
+    <div className="relative w-full bg-black rounded-xl overflow-hidden" 
+         style={{ aspectRatio: '16/9' }}>
+      <iframe
+        src={`https://www.youtube.com/embed/${onlineVideo.id}?autoplay=1&rel=0`}
+        title={onlineVideo.title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+        className="absolute inset-0 w-full h-full"
+      />
+    </div>
+  </div>
+)}
+```
+
+This is triggered from the Explorer when clicking **Reproducir** on a video:
+
+```typescript
+// From page.tsx:143-155
+const handlePlayOnline = useCallback((info: any) => {
+  const videoId = info?.id || info?.webpage_url?.match(/[?&]v=([^&]+)/)?.[1] || '';
+  if (!videoId) return;
+  setOnlineVideo({
+    id: videoId,
+    title: info?.title || 'Video de YouTube',
+    thumbnail: info?.thumbnail || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+  });
+  setSelectedVideo(null);
+  setViewMode('watch');
+});
+```
+
+## File Download
+
+Users can download the actual video file to their device:
+
+```python
+# From main.py:454-462
+@app.get("/api/download/{download_id}/file")
+async def download_file(download_id: str):
+    task = downloads.get(download_id)
+    if not task or task.status != DownloadStatus.COMPLETED:
+        raise HTTPException(404, "Descarga no disponible o no completada")
+    filepath = DOWNLOAD_DIR / task.filename
+    if not filepath.exists():
+        raise HTTPException(404, "Archivo físico no encontrado")
+    return FileResponse(filepath, filename=task.filename)
+```
+
+This opens in a new tab, triggering the browser's download:
+
+```typescript
+// From DownloadManager.tsx:256-263
+<Button
+  onClick={() => onDownloadFile(download.id)}
+  className="text-green-500 hover:bg-green-500/10"
+>
+  <Download className="h-4 w-4" />
+</Button>
+```
+
+## Tips and Best Practices
+
+<Tip>
+  **Fullscreen mode**: Click the fullscreen button in the player or press `F` for immersive viewing
+</Tip>
+
+<Tip>
+  **Keyboard shortcuts**: Use Space to play/pause, arrow keys to seek, and M to mute
+</Tip>
+
+<Warning>
+  The backend server must be running for playback to work. Videos stream from `http://localhost:8001/api/stream/`
+</Warning>
+
+### Browser Compatibility
+
+All modern browsers support MP4/H.264 playback:
+- Chrome/Edge: Full support
+- Firefox: Full support
+- Safari: Full support
+- Mobile browsers: Full support
+
+This is why OfflineTube converts all videos to MP4:
+
+```python
+# From main.py:297
+"merge_output_format": "mp4",
+```
+
+### Audio Verification
+
+The backend verifies audio tracks exist before marking download as complete:
+
+```python
+# From main.py:101-113
+def verify_audio(filepath: Path) -> bool:
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-select_streams", "a",
+            "-show_entries", "stream=index",
+            "-of", "csv=p=0",
+            str(filepath),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.stdout.strip() != ""
+    except Exception:
+        return False
+```
+
+```python
+# From main.py:355-356
+if task.download_type != "audio" and not verify_audio(filepath):
+    raise Exception("El archivo final no contiene pista de audio")
+```
+
+## Related Features
+
+- [Library Management](/features/library-management) - Search and organize your videos
+- [Download Management](/features/download-management) - Download videos for offline viewing
+- [Search and Discovery](/features/search-and-discovery) - Find new videos to download

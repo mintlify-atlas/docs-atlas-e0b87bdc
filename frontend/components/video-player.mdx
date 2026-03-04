@@ -1,0 +1,189 @@
+---
+title: VideoPlayer
+description: A feature-rich video player component with YouTube-like controls and keyboard shortcuts
+---
+
+## Overview
+
+The `VideoPlayer` component is a fully-featured HTML5 video player that replicates YouTube's player experience. It includes playback controls, quality settings, subtitles, chapters, keyboard shortcuts, and multiple viewing modes (theater, fullscreen, mini-player).
+
+## Props
+
+<ParamField path="video" type="Video" required>
+  The video object containing all metadata and URLs. See [Video type](/frontend/types/video) for details.
+</ParamField>
+
+<ParamField path="autoplay" type="boolean" default="false">
+  Whether to automatically start playing the video when it loads.
+</ParamField>
+
+<ParamField path="onEnded" type="() => void">
+  Callback function called when the video finishes playing (unless looping is enabled).
+</ParamField>
+
+<ParamField path="onNext" type="() => void">
+  Callback function for the "Next" button. If not provided, the Next button is hidden.
+</ParamField>
+
+<ParamField path="onPrevious" type="() => void">
+  Callback function for the "Previous" button. If not provided, the Previous button is hidden.
+</ParamField>
+
+## Features
+
+### Playback Controls
+- Play/Pause with visual feedback
+- Progress bar with chapter markers
+- Volume control with mute toggle
+- Playback speed control (0.25x to 2x)
+- Next/Previous navigation
+- Loop/repeat mode
+
+### Viewing Modes
+- **Normal**: Standard player with rounded corners
+- **Theater Mode**: Full-width player without rounded corners
+- **Fullscreen**: Native browser fullscreen
+- **Mini Player**: Picture-in-picture style floating player
+
+### Advanced Features
+- **Chapters**: Visual markers on progress bar with hover tooltips
+- **Subtitles**: Toggle subtitles on/off
+- **Quality Selection**: Switch between available video qualities
+- **Audio Tracks**: Select different audio tracks
+- **Nerd Stats**: Display technical information (resolution, bitrate, codec, fps, buffer health)
+- **Buffering**: Visual buffer progress indicator
+
+### Keyboard Shortcuts
+
+The player supports YouTube-style keyboard shortcuts:
+
+| Key | Action |
+|-----|--------|
+| `Space` or `K` | Play/Pause |
+| `J` | Skip backward 10 seconds |
+| `L` | Skip forward 10 seconds |
+| `←` | Skip backward 5 seconds |
+| `→` | Skip forward 5 seconds |
+| `↑` | Increase volume |
+| `↓` | Decrease volume |
+| `M` | Toggle mute |
+| `F` | Toggle fullscreen |
+| `T` | Toggle theater mode |
+| `I` | Toggle mini player |
+| `C` | Toggle subtitles |
+| `0-9` | Seek to 0%, 10%, 20%, ..., 90% of the video |
+
+### Touch Gestures
+- **Double tap**: Skip forward/backward (left/right side of screen)
+- **Horizontal swipe**: Seek through the video
+- **Auto-hide controls**: Controls fade after 3 seconds of inactivity during playback
+
+## Usage Example
+
+```tsx
+import { VideoPlayer } from '@/components/youtube/VideoPlayer';
+import type { Video } from '@/types/video';
+
+function MyVideoPage() {
+  const video: Video = {
+    id: 'abc123',
+    title: 'Sample Video',
+    videoUrl: '/videos/sample.mp4',
+    thumbnail: '/thumbnails/sample.jpg',
+    duration: '10:30',
+    durationSeconds: 630,
+    qualities: [
+      { label: '1080p', resolution: '1920x1080', bitrate: '6 Mbps', url: '/videos/sample-1080p.mp4', height: 1080 },
+      { label: '720p', resolution: '1280x720', bitrate: '3 Mbps', url: '/videos/sample-720p.mp4', height: 720 },
+    ],
+    subtitles: [
+      { lang: 'en', label: 'English', src: '/subtitles/en.vtt', default: true },
+      { lang: 'es', label: 'Español', src: '/subtitles/es.vtt' },
+    ],
+    audioTracks: [
+      { lang: 'en', label: 'English', default: true },
+    ],
+    chapters: [
+      { title: 'Introduction', startTime: 0 },
+      { title: 'Main Content', startTime: 120 },
+      { title: 'Conclusion', startTime: 540 },
+    ],
+    // ... other required fields
+  };
+
+  const handleVideoEnd = () => {
+    console.log('Video finished playing');
+  };
+
+  const handleNext = () => {
+    console.log('Play next video');
+  };
+
+  const handlePrevious = () => {
+    console.log('Play previous video');
+  };
+
+  return (
+    <div className="aspect-video">
+      <VideoPlayer
+        video={video}
+        autoplay={false}
+        onEnded={handleVideoEnd}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+      />
+    </div>
+  );
+}
+```
+
+## YouTube Embed Support
+
+The component automatically detects YouTube embed URLs and renders an iframe instead of the HTML5 video element:
+
+```tsx
+const youtubeVideo: Video = {
+  // ... other fields
+  videoUrl: 'https://youtube.com/embed/dQw4w9WgXcQ',
+};
+
+// Renders as iframe automatically
+<VideoPlayer video={youtubeVideo} />
+```
+
+## Integration with Other Components
+
+### With VideoInfo Component
+
+Combine `VideoPlayer` with `VideoInfo` to create a complete video viewing experience:
+
+```tsx
+import { VideoPlayer } from '@/components/youtube/VideoPlayer';
+import { VideoInfo } from '@/components/youtube/VideoInfo';
+
+function VideoPage({ video }: { video: Video }) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2">
+        <VideoPlayer video={video} autoplay />
+        <VideoInfo video={video} />
+      </div>
+      <div className="lg:col-span-1">
+        {/* Related videos sidebar */}
+      </div>
+    </div>
+  );
+}
+```
+
+## Source Code Reference
+
+The VideoPlayer component is located at:
+- `/workspace/source/src/components/youtube/VideoPlayer.tsx:47-955`
+
+Key implementation details:
+- Uses React refs for video element and container
+- Implements custom progress bar with chapter markers
+- Handles fullscreen API for cross-browser compatibility
+- Manages playback state with React hooks
+- Supports both controlled and uncontrolled playback modes

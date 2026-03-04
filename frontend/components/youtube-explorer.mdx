@@ -1,0 +1,354 @@
+---
+title: YouTubeExplorer
+description: Search, browse, and select YouTube videos for download with quality options
+---
+
+## Overview
+
+The `YouTubeExplorer` component provides a YouTube-like interface for searching videos, browsing trending content, viewing video details, and selecting download options (quality, format, video/audio-only).
+
+## Props
+
+<ParamField path="onDownload" type="(url: string, options: Omit<DownloadOptions, 'url' | 'subtitle_langs' | 'download_thumbnail'>) => void" required>
+  Callback function called when the user clicks the download button with the selected video URL and options.
+</ParamField>
+
+<ParamField path="onPlayOnline" type="(info: VideoInfo) => void">
+  Optional callback for playing the video online without downloading. If provided, shows a "Play" button.
+</ParamField>
+
+<ParamField path="apiUrl" type="string" required>
+  Base URL of the backend API for search, trending, and video info endpoints.
+</ParamField>
+
+<ParamField path="defaultQuality" type="string" default="'720p'">
+  Default quality to select when a video is loaded.
+</ParamField>
+
+<ParamField path="defaultDownloadType" type="'video' | 'audio'" default="'video'">
+  Default download type (video or audio-only).
+</ParamField>
+
+## Features
+
+### Search Functionality
+
+- **Text Search**: Search YouTube by keywords
+- **URL Support**: Paste YouTube video URLs directly
+- **Trending Videos**: Auto-loads trending videos on mount
+- **Search Results**: Displays up to 20 search results with thumbnails, title, uploader, views, and duration
+
+### Video Information
+
+Click any video to load detailed information:
+- Title and description
+- Uploader name and subscriber count
+- View count and upload date
+- Duration
+- Available formats and qualities
+- Thumbnail preview
+
+### Download Options
+
+#### Video Tab
+- Select from available video qualities (1080p, 720p, 480p, etc.)
+- Shows format (MP4, WebM, etc.)
+- Displays approximate file size
+- Note: Audio is automatically merged using "bestaudio" format
+
+#### Audio Tab
+- Select from available audio qualities (128kbps, 192kbps, 256kbps, etc.)
+- Shows audio codec (opus, m4a, etc.)
+- Displays bitrate information
+
+### Playlist Detection
+
+Automatically detects playlists and displays:
+- Playlist indicator badge
+- Number of videos in the playlist
+- Note that all videos will be downloaded
+
+### Theme Support
+
+Fully responsive dark/light theme support with the `useTheme` hook.
+
+## API Endpoints
+
+The component expects these backend endpoints:
+
+### Search
+```
+GET /api/search?q={query}&max_results=20
+```
+
+Response:
+```json
+{
+  "results": [
+    {
+      "id": "abc123",
+      "title": "Video Title",
+      "duration": 630,
+      "uploader": "Channel Name",
+      "thumbnail": "https://...",
+      "url": "https://youtube.com/watch?v=abc123",
+      "view_count": 1000000
+    }
+  ]
+}
+```
+
+### Trending
+```
+GET /api/trending?max_results=20
+```
+
+Same response format as search.
+
+### Video Info
+```
+POST /api/info
+Content-Type: application/json
+
+{
+  "url": "https://youtube.com/watch?v=abc123"
+}
+```
+
+Response: See [VideoInfo type](/frontend/types/downloader).
+
+## Usage Example
+
+```tsx
+import { YouTubeExplorer } from '@/components/downloader/YouTubeExplorer';
+import type { DownloadOptions } from '@/types/downloader';
+import { toast } from 'sonner';
+
+function ExplorerPage() {
+  const handleDownload = async (
+    url: string,
+    options: Omit<DownloadOptions, 'url' | 'subtitle_langs' | 'download_thumbnail'>
+  ) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          ...options,
+          subtitle_langs: ['en'], // Add default subtitle languages
+          download_thumbnail: true, // Always download thumbnail
+        }),
+      });
+
+      if (response.ok) {
+        const task = await response.json();
+        toast.success(`Download started: ${task.title}`);
+      } else {
+        toast.error('Failed to start download');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Network error');
+    }
+  };
+
+  const handlePlayOnline = (info: VideoInfo) => {
+    // Navigate to video player or open in new tab
+    window.open(info.webpage_url, '_blank');
+  };
+
+  return (
+    <div className="h-screen">
+      <YouTubeExplorer
+        onDownload={handleDownload}
+        onPlayOnline={handlePlayOnline}
+        apiUrl="http://localhost:8000"
+        defaultQuality="1080p"
+        defaultDownloadType="video"
+      />
+    </div>
+  );
+}
+```
+
+## Advanced Usage: Custom Quality Selection
+
+The component automatically groups formats by quality, but you can customize the selection logic:
+
+```tsx
+import { useState } from 'react';
+
+function AdvancedExplorer() {
+  const [customOptions, setCustomOptions] = useState({
+    quality: '1080p',
+    download_type: 'video' as 'video' | 'audio',
+    format_id: '', // Specific format ID
+  });
+
+  const handleDownload = async (url: string, options: any) => {
+    // Merge custom options with component options
+    const finalOptions = { ...options, ...customOptions };
+    
+    await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, ...finalOptions }),
+    });
+  };
+
+  return (
+    <YouTubeExplorer
+      onDownload={handleDownload}
+      apiUrl="http://localhost:8000"
+      defaultQuality={customOptions.quality}
+      defaultDownloadType={customOptions.download_type}
+    />
+  );
+}
+```
+
+## Keyboard Shortcuts
+
+- **Enter**: Submit search when focused on search input
+
+## Helper Functions
+
+The component includes useful utilities:
+
+### formatDuration
+
+Converts seconds to readable duration:
+
+```tsx
+formatDuration(630)   // "10:30"
+formatDuration(3665)  // "1:01:05"
+```
+
+### formatBytes
+
+Converts bytes to human-readable format:
+
+```tsx
+formatBytes(157286400)  // "150.00 MB"
+formatBytes(undefined)  // "Tamaño desconocido"
+```
+
+## Responsive Layout
+
+The component adapts to different screen sizes:
+
+### Mobile (< 1024px)
+- Stacked layout
+- Full-width search results
+- Detail panel below search results
+- Grid layout for trending videos (2 columns on small screens)
+
+### Desktop (>= 1024px)
+- Side-by-side layout
+- Search results on left (50% width)
+- Detail panel on right (50% width)
+- Grid layout for trending videos (up to 5 columns)
+
+## Error Handling
+
+The component handles various error scenarios:
+
+- **Network Errors**: Displays toast notification and logs to console
+- **API Unavailable**: Silent failure with console warnings (counts failures to avoid spam)
+- **Invalid URLs**: Backend validation with error messages
+- **Missing API URL**: Shows error toast
+
+## State Management
+
+The component manages these internal states:
+
+```tsx
+const [searchQuery, setSearchQuery] = useState('');
+const [isSearching, setIsSearching] = useState(false);
+const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+const [trendingResults, setTrendingResults] = useState<SearchResult[]>([]);
+const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
+const [isLoadingInfo, setIsLoadingInfo] = useState(false);
+const [downloadOptions, setDownloadOptions] = useState({
+  quality: '720p',
+  download_type: 'video' as 'video' | 'audio',
+  format_id: '',
+});
+```
+
+## Integration Example: Full Downloader App
+
+```tsx
+import { YouTubeExplorer } from '@/components/downloader/YouTubeExplorer';
+import { DownloadManager } from '@/components/downloader/DownloadManager';
+import { VideoPlayer } from '@/components/youtube/VideoPlayer';
+import { useState } from 'react';
+
+function FullDownloaderApp() {
+  const [view, setView] = useState<'explorer' | 'downloads' | 'player'>('explorer');
+  const [downloads, setDownloads] = useState<DownloadTask[]>([]);
+  const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
+
+  const handleDownload = async (url: string, options: any) => {
+    const response = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, ...options }),
+    });
+    const task = await response.json();
+    setDownloads(prev => [...prev, task]);
+    setView('downloads');
+  };
+
+  const handlePlayOnline = (info: VideoInfo) => {
+    // Convert VideoInfo to Video format for player
+    const video = convertToVideo(info);
+    setCurrentVideo(video);
+    setView('player');
+  };
+
+  return (
+    <div className="h-screen flex flex-col">
+      <nav className="flex gap-2 p-4 border-b">
+        <button onClick={() => setView('explorer')}>Explorer</button>
+        <button onClick={() => setView('downloads')}>Downloads ({downloads.length})</button>
+        {currentVideo && <button onClick={() => setView('player')}>Player</button>}
+      </nav>
+      
+      <div className="flex-1">
+        {view === 'explorer' && (
+          <YouTubeExplorer
+            onDownload={handleDownload}
+            onPlayOnline={handlePlayOnline}
+            apiUrl="http://localhost:8000"
+          />
+        )}
+        {view === 'downloads' && (
+          <DownloadManager
+            downloads={downloads}
+            onCancel={handleCancel}
+            onRemove={handleRemove}
+            onRetry={handleRetry}
+            onDownloadFile={handleDownloadFile}
+            apiUrl="http://localhost:8000"
+          />
+        )}
+        {view === 'player' && currentVideo && (
+          <VideoPlayer video={currentVideo} autoplay />
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+## Source Code Reference
+
+The YouTubeExplorer component is located at:
+- `/workspace/source/src/components/downloader/YouTubeExplorer.tsx:18-492`
+
+Key dependencies:
+- `useTheme` hook for theme support
+- `sonner` for toast notifications
+- `@/components/ui` for UI primitives (Input, Button, Tabs)

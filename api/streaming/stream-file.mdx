@@ -1,0 +1,229 @@
+---
+title: "Stream Video File"
+api: "GET /api/stream/{filename}"
+description: "Stream downloaded video files with HTTP range request support for efficient video playback"
+---
+
+## Overview
+
+This endpoint provides video streaming functionality with full HTTP range request support, enabling efficient video playback with seek capabilities. The server implements partial content delivery (HTTP 206 responses) when clients request specific byte ranges.
+
+## How HTTP Range Streaming Works
+
+The streaming endpoint supports the HTTP `Range` header, which allows clients to request specific portions of a file. This is essential for:
+
+- **Video player seeking**: Jump to any point in the video without downloading the entire file
+- **Bandwidth optimization**: Download only the portions of the video being watched
+- **Resume interrupted downloads**: Continue from where playback stopped
+- **Mobile-friendly playback**: Efficient streaming on limited bandwidth connections
+
+### Range Request Flow
+
+1. Client sends a request with `Range: bytes=start-end` header
+2. Server parses the range and validates bounds
+3. Server reads the requested chunk from disk (default 64KB blocks)
+4. Server responds with HTTP 206 (Partial Content) and appropriate headers
+5. Client receives only the requested portion of the file
+
+## Endpoint
+
+<ParamField path="filename" type="string" required>
+  The name of the downloaded video file. This should match the filename returned from a completed download task (format: `title__task-id.ext`).
+</ParamField>
+
+## Request Headers
+
+<ParamField header="Range" type="string">
+  Optional HTTP range header to request a specific byte range of the file.
+  
+  **Format**: `bytes=start-end`
+  
+  - `start`: Zero-based byte offset (required)
+  - `end`: Last byte to include (optional, defaults to end of file)
+  
+  **Examples**:
+  - `bytes=0-1023` - First 1024 bytes
+  - `bytes=1024-` - From byte 1024 to end of file
+  - `bytes=1000-2000` - Bytes 1000 through 2000 inclusive
+</ParamField>
+
+## Response
+
+### Without Range Header
+
+Returns the complete file with HTTP 200.
+
+<ResponseField name="Content-Type" type="string">
+  `video/mp4`
+</ResponseField>
+
+<ResponseField name="Content-Length" type="integer">
+  Total file size in bytes
+</ResponseField>
+
+### With Range Header
+
+Returns partial content with HTTP 206.
+
+<ResponseField name="Content-Range" type="string">
+  Indicates which bytes are being returned and the total file size.
+  
+  **Format**: `bytes start-end/total`
+  
+  Example: `bytes 0-1023/5242880` (first 1024 bytes of a ~5MB file)
+</ResponseField>
+
+<ResponseField name="Accept-Ranges" type="string">
+  Always returns `bytes` to indicate the server supports range requests
+</ResponseField>
+
+<ResponseField name="Content-Length" type="integer">
+  Size of the returned chunk in bytes (end - start + 1)
+</ResponseField>
+
+<ResponseField name="Content-Type" type="string">
+  `video/mp4`
+</ResponseField>
+
+## Implementation Details
+
+### Range Parsing
+
+The server parses the Range header using a regex pattern: `bytes=(\d+)-(\d*)`
+
+- If end byte is not specified, it defaults to the last byte of the file
+- The end byte is clamped to `file_size - 1` to prevent out-of-bounds reads
+- Invalid range formats fall back to returning the complete file
+
+### Chunk Streaming
+
+The server streams the requested range in 64KB (65536 bytes) blocks:
+
+```python
+def iterfile():
+    with open(filepath, "rb") as f:
+        f.seek(start)
+        remaining = chunk_size
+        while remaining > 0:
+            data = f.read(min(65536, remaining))
+            if not data:
+                break
+            remaining -= len(data)
+            yield data
+```
+
+This approach ensures:
+- Memory efficiency: Only 64KB in memory at a time
+- Responsive streaming: Data begins flowing immediately
+- Proper cleanup: File handle is closed after streaming completes
+
+## Examples
+
+### Basic Playback (Full File)
+
+```bash
+curl http://localhost:8001/api/stream/My_Video__123e4567-e89b-12d3.mp4
+```
+
+Returns HTTP 200 with the complete file.
+
+### Range Request (First 1MB)
+
+```bash
+curl -H "Range: bytes=0-1048575" \
+  http://localhost:8001/api/stream/My_Video__123e4567-e89b-12d3.mp4
+```
+
+Response:
+```
+HTTP/1.1 206 Partial Content
+Content-Range: bytes 0-1048575/52428800
+Accept-Ranges: bytes
+Content-Length: 1048576
+Content-Type: video/mp4
+
+[binary data...]
+```
+
+### Range Request (Resume from 10MB)
+
+```bash
+curl -H "Range: bytes=10485760-" \
+  http://localhost:8001/api/stream/My_Video__123e4567-e89b-12d3.mp4
+```
+
+Response:
+```
+HTTP/1.1 206 Partial Content
+Content-Range: bytes 10485760-52428799/52428800
+Accept-Ranges: bytes
+Content-Length: 41943040
+Content-Type: video/mp4
+
+[binary data...]
+```
+
+### Seeking to Middle of Video
+
+```bash
+# Request bytes from ~25MB mark
+curl -H "Range: bytes=26214400-27262975" \
+  http://localhost:8001/api/stream/My_Video__123e4567-e89b-12d3.mp4
+```
+
+Response:
+```
+HTTP/1.1 206 Partial Content
+Content-Range: bytes 26214400-27262975/52428800
+Accept-Ranges: bytes
+Content-Length: 1048576
+Content-Type: video/mp4
+
+[binary data...]
+```
+
+### Using with HTML5 Video Player
+
+```html
+<video controls width="640">
+  <source src="http://localhost:8001/api/stream/My_Video__123e4567-e89b-12d3.mp4" 
+          type="video/mp4">
+</video>
+```
+
+The browser automatically sends Range requests as the user seeks through the video.
+
+## Error Responses
+
+<ResponseField name="404" type="error">
+  **File not found**
+  
+  The specified filename does not exist in the downloads directory.
+  
+  ```json
+  {
+    "detail": "Archivo no encontrado"
+  }
+  ```
+</ResponseField>
+
+## Video Player Integration
+
+Most modern video players automatically use range requests:
+
+- **HTML5 `<video>` tag**: Sends range requests when seeking
+- **Video.js**: Full range request support
+- **Plyr**: Automatic range handling
+- **Mobile browsers**: Optimize with range requests on cellular
+
+## Performance Considerations
+
+- **Chunk size**: 64KB blocks balance memory usage and streaming performance
+- **Disk I/O**: Sequential reads are optimized by the OS filesystem cache
+- **Concurrent streams**: Each request opens a separate file handle
+- **No buffering**: Streaming begins immediately, no file pre-loading required
+
+## Related Endpoints
+
+- [GET /api/download/{download_id}/file](/api/downloads/download-file) - Download complete file (not streaming)
+- [GET /api/downloads](/api/downloads/list-downloads) - List all downloads to get filenames

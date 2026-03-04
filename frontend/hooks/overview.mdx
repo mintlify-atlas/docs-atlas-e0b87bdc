@@ -1,0 +1,367 @@
+---
+title: Hooks Overview
+description: Custom React hooks available in the OfflineTube application
+---
+
+## Overview
+
+OfflineTube provides several custom React hooks to simplify common tasks like theme management, toast notifications, and responsive design.
+
+## Available Hooks
+
+### useTheme
+
+Manages application theme (dark/light mode) with localStorage persistence.
+
+**Location**: `/workspace/source/src/lib/theme.tsx:241`
+
+#### Returns
+
+```tsx
+interface ThemeContextType {
+  theme: 'dark' | 'light';
+  setTheme: (theme: 'dark' | 'light') => void;
+  toggleTheme: () => void;
+}
+```
+
+#### Usage
+
+```tsx
+import { useTheme } from '@/lib/theme';
+
+function ThemeToggleButton() {
+  const { theme, toggleTheme } = useTheme();
+
+  return (
+    <button onClick={toggleTheme}>
+      Current theme: {theme}
+      Switch to {theme === 'dark' ? 'light' : 'dark'} mode
+    </button>
+  );
+}
+```
+
+#### Features
+
+- **Automatic persistence**: Saves theme preference to `localStorage` with key `'yt-theme'`
+- **Dynamic styling**: Injects CSS overrides for light mode at runtime
+- **HTML class management**: Adds/removes `'dark'` and `'light'` classes on `<html>` element
+- **SSR-safe**: Handles initial theme load from localStorage in `useEffect`
+
+#### Theme Provider Setup
+
+Wrap your app with `ThemeProvider` to enable the hook:
+
+```tsx
+import { ThemeProvider } from '@/lib/theme';
+
+function App() {
+  return (
+    <ThemeProvider>
+      <YourAppContent />
+    </ThemeProvider>
+  );
+}
+```
+
+#### Implementation Details
+
+The hook uses React Context under the hood and applies theme changes by:
+1. Adding/removing CSS classes on the HTML element
+2. Injecting or removing a runtime `<style>` tag with light mode overrides
+3. Persisting the selection to localStorage
+
+This approach allows Tailwind arbitrary values (like `bg-[#0f0f0f]`) to work without crashing the CSS parser in development.
+
+---
+
+### useToast
+
+Displays toast notifications for user feedback (success, error, info messages).
+
+**Location**: `/workspace/source/src/hooks/use-toast.ts:174`
+
+**Inspired by**: [react-hot-toast](https://react-hot-toast.com/)
+
+#### Returns
+
+```tsx
+interface UseToastReturn {
+  toasts: ToasterToast[];
+  toast: (props: Toast) => { id: string; dismiss: () => void; update: (props: ToasterToast) => void };
+  dismiss: (toastId?: string) => void;
+}
+```
+
+#### Usage
+
+```tsx
+import { useToast } from '@/hooks/use-toast';
+
+function DownloadButton() {
+  const { toast } = useToast();
+
+  const handleDownload = async () => {
+    try {
+      await downloadFile();
+      toast({
+        title: 'Success',
+        description: 'File downloaded successfully',
+        variant: 'default',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to download file',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return <button onClick={handleDownload}>Download</button>;
+}
+```
+
+#### Using with Sonner
+
+OfflineTube also uses `sonner` for toast notifications. The recommended approach is to use `sonner` directly:
+
+```tsx
+import { toast } from 'sonner';
+
+function Example() {
+  const handleAction = () => {
+    toast.success('Operation completed!');
+    toast.error('Something went wrong');
+    toast.info('Did you know...');
+  };
+
+  return <button onClick={handleAction}>Trigger Toast</button>;
+}
+```
+
+#### Toast Options
+
+```tsx
+type Toast = {
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  action?: ToastActionElement;
+  variant?: 'default' | 'destructive';
+};
+```
+
+#### Managing Toasts
+
+```tsx
+const { toast, dismiss } = useToast();
+
+// Show a toast
+const { id } = toast({ title: 'Processing...' });
+
+// Dismiss a specific toast
+dismiss(id);
+
+// Dismiss all toasts
+dismiss();
+```
+
+#### Advanced: Update Toast
+
+```tsx
+const { toast } = useToast();
+
+const { update } = toast({
+  title: 'Uploading...',
+  description: '0%',
+});
+
+// Later, update the same toast
+update({
+  title: 'Upload Complete',
+  description: '100%',
+});
+```
+
+---
+
+### useIsMobile
+
+Detects if the current viewport is mobile-sized (< 768px).
+
+**Location**: `/workspace/source/src/hooks/use-mobile.ts:5`
+
+#### Returns
+
+```tsx
+boolean // true if viewport width < 768px, false otherwise
+```
+
+#### Usage
+
+```tsx
+import { useIsMobile } from '@/hooks/use-mobile';
+
+function ResponsiveComponent() {
+  const isMobile = useIsMobile();
+
+  return (
+    <div>
+      {isMobile ? (
+        <MobileLayout />
+      ) : (
+        <DesktopLayout />
+      )}
+    </div>
+  );
+}
+```
+
+#### Conditional Rendering
+
+```tsx
+function Sidebar() {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return <MobileDrawer />;
+  }
+
+  return <DesktopSidebar />;
+}
+```
+
+#### Breakpoint
+
+The hook uses a breakpoint of **768px**, which corresponds to Tailwind's `md:` breakpoint.
+
+```tsx
+const MOBILE_BREAKPOINT = 768;
+```
+
+#### Features
+
+- **Reactive**: Updates when window is resized
+- **SSR-safe**: Returns `undefined` initially, then resolves after mount
+- **Performant**: Uses `matchMedia` API with event listeners
+- **Cleanup**: Automatically removes listeners on unmount
+
+#### Advanced: Custom Breakpoint
+
+If you need a different breakpoint, create your own hook:
+
+```tsx
+import * as React from 'react';
+
+function useCustomBreakpoint(breakpoint: number) {
+  const [matches, setMatches] = React.useState<boolean | undefined>(undefined);
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const onChange = () => setMatches(window.innerWidth < breakpoint);
+    mql.addEventListener('change', onChange);
+    setMatches(window.innerWidth < breakpoint);
+    return () => mql.removeEventListener('change', onChange);
+  }, [breakpoint]);
+
+  return !!matches;
+}
+
+// Usage
+function Component() {
+  const isSmall = useCustomBreakpoint(640);  // Tailwind 'sm'
+  const isMedium = useCustomBreakpoint(768); // Tailwind 'md'
+  const isLarge = useCustomBreakpoint(1024); // Tailwind 'lg'
+}
+```
+
+---
+
+## Best Practices
+
+### Theme Hook
+
+1. **Always wrap with ThemeProvider**: Ensure `ThemeProvider` wraps your app root
+2. **Use theme-aware classes**: The hook manages CSS classes, so use conditional classNames based on theme
+3. **Avoid manual theme detection**: Use the hook instead of checking `document.documentElement.classList`
+
+### Toast Hook
+
+1. **Prefer sonner**: Use `sonner` library directly for simpler toast notifications
+2. **Keep messages concise**: Toast messages should be brief and actionable
+3. **Use appropriate variants**: `default` for success/info, `destructive` for errors
+4. **Dismiss programmatically**: Store toast IDs if you need to dismiss them later
+
+### Mobile Hook
+
+1. **Combine with Tailwind**: Use for JS logic, but prefer Tailwind responsive classes for styling
+2. **Handle undefined state**: The initial value is `undefined` during SSR
+3. **Avoid overuse**: Use CSS media queries when possible for better performance
+
+---
+
+## Hook Composition Example
+
+Combine multiple hooks for complex components:
+
+```tsx
+import { useTheme } from '@/lib/theme';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
+
+function AdaptiveComponent() {
+  const { theme } = useTheme();
+  const isMobile = useIsMobile();
+
+  const handleAction = () => {
+    const message = isMobile ? 'Action on mobile' : 'Action on desktop';
+    toast.success(message);
+  };
+
+  const containerClass = isMobile
+    ? 'p-2'
+    : theme === 'dark'
+    ? 'p-6 bg-[#0f0f0f]'
+    : 'p-6 bg-white';
+
+  return (
+    <div className={containerClass}>
+      <button onClick={handleAction}>Perform Action</button>
+    </div>
+  );
+}
+```
+
+---
+
+## Creating Custom Hooks
+
+Follow these patterns when creating new hooks:
+
+```tsx
+import { useState, useEffect } from 'react';
+
+export function useCustomHook() {
+  const [state, setState] = useState<Type>(initialValue);
+
+  useEffect(() => {
+    // Setup
+    const listener = () => setState(newValue);
+    window.addEventListener('event', listener);
+
+    // Cleanup
+    return () => window.removeEventListener('event', listener);
+  }, [dependencies]);
+
+  return state;
+}
+```
+
+### Guidelines
+
+1. **Prefix with `use`**: All hooks must start with `use`
+2. **Return consistent types**: Avoid changing return type based on conditions
+3. **Document return values**: Use JSDoc or TypeScript interfaces
+4. **Handle cleanup**: Always remove event listeners and clear timers
+5. **Be mindful of dependencies**: Include all dependencies in `useEffect` arrays

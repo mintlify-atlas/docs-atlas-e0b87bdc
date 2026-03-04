@@ -1,0 +1,600 @@
+---
+title: Downloader Types
+description: TypeScript interfaces and types for YouTube downloading and video information
+---
+
+## Overview
+
+The downloader types define data structures for video downloading, format selection, search results, and download task management.
+
+**Location**: `/workspace/source/src/types/downloader.ts`
+
+---
+
+## VideoFormat
+
+Represents a single video or audio format available for download.
+
+```tsx
+interface VideoFormat {
+  format_id: string;
+  ext: string;
+  quality: string;
+  resolution?: string;
+  filesize?: number;
+  filesize_approx?: string;
+  vcodec?: string;
+  acodec?: string;
+  abr?: number;
+  vbr?: number;
+  fps?: number;
+  asr?: number;
+  audio_channels?: number;
+  format_note: string;
+}
+```
+
+### Fields
+
+<ParamField path="format_id" type="string" required>
+  Unique identifier for this format (used for selecting specific formats).
+</ParamField>
+
+<ParamField path="ext" type="string" required>
+  File extension (e.g., `"mp4"`, `"webm"`, `"m4a"`).
+</ParamField>
+
+<ParamField path="quality" type="string" required>
+  Quality label (e.g., `"1080p"`, `"720p"`, `"audio only"`).
+</ParamField>
+
+<ParamField path="resolution" type="string">
+  Video resolution (e.g., `"1920x1080"`, `"1280x720"`).
+</ParamField>
+
+<ParamField path="filesize" type="number">
+  Exact file size in bytes (may be undefined if unknown).
+</ParamField>
+
+<ParamField path="filesize_approx" type="string">
+  Approximate file size as a human-readable string (e.g., `"150 MB"`).
+</ParamField>
+
+<ParamField path="vcodec" type="string">
+  Video codec (e.g., `"avc1.64001f"`, `"vp9"`, `"none"` for audio-only).
+</ParamField>
+
+<ParamField path="acodec" type="string">
+  Audio codec (e.g., `"opus"`, `"mp4a.40.2"`, `"none"` for video-only).
+</ParamField>
+
+<ParamField path="abr" type="number">
+  Audio bitrate in kbps (e.g., `128`, `192`, `256`).
+</ParamField>
+
+<ParamField path="vbr" type="number">
+  Video bitrate in kbps.
+</ParamField>
+
+<ParamField path="fps" type="number">
+  Frames per second (e.g., `30`, `60`).
+</ParamField>
+
+<ParamField path="asr" type="number">
+  Audio sample rate in Hz (e.g., `44100`, `48000`).
+</ParamField>
+
+<ParamField path="audio_channels" type="number">
+  Number of audio channels (e.g., `1` for mono, `2` for stereo).
+</ParamField>
+
+<ParamField path="format_note" type="string" required>
+  Human-readable format description (e.g., `"1080p (mp4)"`, `"medium, m4a"`).
+</ParamField>
+
+### Example
+
+```tsx
+const formats: VideoFormat[] = [
+  {
+    format_id: '137',
+    ext: 'mp4',
+    quality: '1080p',
+    resolution: '1920x1080',
+    filesize: 157286400,
+    vcodec: 'avc1.640028',
+    acodec: 'none',
+    vbr: 4000,
+    fps: 30,
+    format_note: '1080p (mp4)',
+  },
+  {
+    format_id: '251',
+    ext: 'webm',
+    quality: 'audio only',
+    filesize: 4194304,
+    vcodec: 'none',
+    acodec: 'opus',
+    abr: 160,
+    asr: 48000,
+    audio_channels: 2,
+    format_note: 'medium, webm',
+  },
+];
+```
+
+---
+
+## VideoInfo
+
+Complete information about a YouTube video, including all available formats.
+
+```tsx
+interface VideoInfo {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  duration: number;
+  uploader: string;
+  uploader_url: string;
+  view_count: number;
+  like_count: number;
+  upload_date: string;
+  formats: VideoFormat[];
+  subtitles: Record<string, Array<{url: string; name: string}>>;
+  is_playlist: boolean;
+  playlist_count?: number;
+  webpage_url: string;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  YouTube video ID (e.g., `"dQw4w9WgXcQ"`).
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Video title.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Full video description.
+</ParamField>
+
+<ParamField path="thumbnail" type="string" required>
+  URL to video thumbnail image.
+</ParamField>
+
+<ParamField path="duration" type="number" required>
+  Video duration in seconds.
+</ParamField>
+
+<ParamField path="uploader" type="string" required>
+  Channel name / uploader name.
+</ParamField>
+
+<ParamField path="uploader_url" type="string" required>
+  URL to uploader's channel page.
+</ParamField>
+
+<ParamField path="view_count" type="number" required>
+  Total view count.
+</ParamField>
+
+<ParamField path="like_count" type="number" required>
+  Number of likes.
+</ParamField>
+
+<ParamField path="upload_date" type="string" required>
+  Upload date in `YYYYMMDD` format (e.g., `"20240115"`).
+</ParamField>
+
+<ParamField path="formats" type="VideoFormat[]" required>
+  Array of all available download formats.
+</ParamField>
+
+<ParamField path="subtitles" type="Record<string, Array<{url: string; name: string}>>" required>
+  Available subtitles indexed by language code.
+</ParamField>
+
+<ParamField path="is_playlist" type="boolean" required>
+  Whether the URL is a playlist.
+</ParamField>
+
+<ParamField path="playlist_count" type="number">
+  Number of videos in the playlist (only if `is_playlist` is true).
+</ParamField>
+
+<ParamField path="webpage_url" type="string" required>
+  Original YouTube URL.
+</ParamField>
+
+### Example
+
+```tsx
+const videoInfo: VideoInfo = {
+  id: 'dQw4w9WgXcQ',
+  title: 'Rick Astley - Never Gonna Give You Up',
+  description: 'The official video for "Never Gonna Give You Up" by Rick Astley...',
+  thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+  duration: 212,
+  uploader: 'Rick Astley',
+  uploader_url: 'https://www.youtube.com/@RickAstley',
+  view_count: 1400000000,
+  like_count: 15000000,
+  upload_date: '20091025',
+  formats: [
+    // ... array of VideoFormat objects
+  ],
+  subtitles: {
+    en: [{ url: 'https://...', name: 'English' }],
+    es: [{ url: 'https://...', name: 'Spanish' }],
+  },
+  is_playlist: false,
+  webpage_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+};
+```
+
+---
+
+## SearchResult
+
+Represents a single video in search results or trending list.
+
+```tsx
+interface SearchResult {
+  id: string;
+  title: string;
+  duration: number;
+  uploader: string;
+  thumbnail: string;
+  url: string;
+  view_count: number;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  YouTube video ID.
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Video title.
+</ParamField>
+
+<ParamField path="duration" type="number" required>
+  Duration in seconds.
+</ParamField>
+
+<ParamField path="uploader" type="string" required>
+  Channel/uploader name.
+</ParamField>
+
+<ParamField path="thumbnail" type="string" required>
+  Thumbnail image URL.
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  Full YouTube watch URL.
+</ParamField>
+
+<ParamField path="view_count" type="number" required>
+  Number of views.
+</ParamField>
+
+### Example
+
+```tsx
+const searchResults: SearchResult[] = [
+  {
+    id: 'abc123',
+    title: 'How to Learn TypeScript',
+    duration: 1230,
+    uploader: 'Code Academy',
+    thumbnail: 'https://i.ytimg.com/vi/abc123/hqdefault.jpg',
+    url: 'https://www.youtube.com/watch?v=abc123',
+    view_count: 500000,
+  },
+];
+```
+
+---
+
+## DownloadTask
+
+Represents an active or completed download task with progress tracking.
+
+```tsx
+interface DownloadTask {
+  id: string;
+  url: string;
+  title: string;
+  status: 'pending' | 'downloading' | 'processing' | 'completed' | 'error' | 'cancelled';
+  progress: number;
+  speed: string;
+  eta: string;
+  thumbnail: string;
+  format_note: string;
+  filesize: number;
+  downloaded_bytes: number;
+  is_playlist: boolean;
+  playlist_index: number;
+  playlist_total: number;
+  quality: string;
+  download_type: string;
+  created_at: string;
+  completed_at?: string;
+  error_message?: string;
+  filename?: string;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique download task ID.
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  YouTube video URL.
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  Video title.
+</ParamField>
+
+<ParamField path="status" type="'pending' | 'downloading' | 'processing' | 'completed' | 'error' | 'cancelled'" required>
+  Current download status.
+</ParamField>
+
+<ParamField path="progress" type="number" required>
+  Download progress as a percentage (0-100).
+</ParamField>
+
+<ParamField path="speed" type="string" required>
+  Current download speed (e.g., `"3.2 MB/s"`, `"0 B/s"`).
+</ParamField>
+
+<ParamField path="eta" type="string" required>
+  Estimated time remaining (e.g., `"2m 15s"`, `"Unknown"`).
+</ParamField>
+
+<ParamField path="thumbnail" type="string" required>
+  Video thumbnail URL.
+</ParamField>
+
+<ParamField path="format_note" type="string" required>
+  Format description (e.g., `"1080p (mp4)"`).
+</ParamField>
+
+<ParamField path="filesize" type="number" required>
+  Total file size in bytes.
+</ParamField>
+
+<ParamField path="downloaded_bytes" type="number" required>
+  Bytes downloaded so far.
+</ParamField>
+
+<ParamField path="is_playlist" type="boolean" required>
+  Whether this is part of a playlist download.
+</ParamField>
+
+<ParamField path="playlist_index" type="number" required>
+  Current video index in playlist (0 if not a playlist).
+</ParamField>
+
+<ParamField path="playlist_total" type="number" required>
+  Total videos in playlist (0 if not a playlist).
+</ParamField>
+
+<ParamField path="quality" type="string" required>
+  Selected quality (e.g., `"1080p"`, `"720p"`).
+</ParamField>
+
+<ParamField path="download_type" type="string" required>
+  Type of download (e.g., `"video"`, `"audio"`).
+</ParamField>
+
+<ParamField path="created_at" type="string" required>
+  ISO 8601 timestamp when download was created.
+</ParamField>
+
+<ParamField path="completed_at" type="string">
+  ISO 8601 timestamp when download completed (only for completed downloads).
+</ParamField>
+
+<ParamField path="error_message" type="string">
+  Error message (only for failed downloads).
+</ParamField>
+
+<ParamField path="filename" type="string">
+  Downloaded filename (only for completed downloads).
+</ParamField>
+
+### Example
+
+```tsx
+const downloadTask: DownloadTask = {
+  id: 'dl_001',
+  url: 'https://www.youtube.com/watch?v=abc123',
+  title: 'Amazing Tutorial Video',
+  status: 'downloading',
+  progress: 45.5,
+  speed: '3.2 MB/s',
+  eta: '2m 15s',
+  thumbnail: 'https://i.ytimg.com/vi/abc123/hqdefault.jpg',
+  format_note: '1080p (mp4)',
+  filesize: 157286400,
+  downloaded_bytes: 71557939,
+  is_playlist: false,
+  playlist_index: 0,
+  playlist_total: 0,
+  quality: '1080p',
+  download_type: 'video',
+  created_at: '2024-01-15T10:30:00Z',
+};
+```
+
+---
+
+## DownloadOptions
+
+Options for initiating a new download.
+
+```tsx
+interface DownloadOptions {
+  url: string;
+  format_id?: string;
+  quality: string;
+  download_type: 'video' | 'audio';
+  subtitle_langs: string[];
+  download_thumbnail: boolean;
+}
+```
+
+### Fields
+
+<ParamField path="url" type="string" required>
+  YouTube video or playlist URL.
+</ParamField>
+
+<ParamField path="format_id" type="string">
+  Specific format ID to download (optional, uses quality if not specified).
+</ParamField>
+
+<ParamField path="quality" type="string" required>
+  Desired quality (e.g., `"1080p"`, `"720p"`, `"best"`).
+</ParamField>
+
+<ParamField path="download_type" type="'video' | 'audio'" required>
+  Whether to download video or audio-only.
+</ParamField>
+
+<ParamField path="subtitle_langs" type="string[]" required>
+  Array of language codes for subtitles to download (e.g., `["en", "es"]`).
+</ParamField>
+
+<ParamField path="download_thumbnail" type="boolean" required>
+  Whether to download the video thumbnail.
+</ParamField>
+
+### Example
+
+```tsx
+const downloadOptions: DownloadOptions = {
+  url: 'https://www.youtube.com/watch?v=abc123',
+  format_id: '137+251', // Video format + audio format
+  quality: '1080p',
+  download_type: 'video',
+  subtitle_langs: ['en', 'es'],
+  download_thumbnail: true,
+};
+
+// Send to backend
+fetch('/api/download', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(downloadOptions),
+});
+```
+
+---
+
+## ViewMode
+
+Defines the current view mode in the downloader interface.
+
+```tsx
+type ViewMode = 'player' | 'explorer' | 'downloads';
+```
+
+### Values
+
+- `'player'`: Video player view
+- `'explorer'`: YouTube search/browse view
+- `'downloads'`: Download manager view
+
+### Example
+
+```tsx
+import { useState } from 'react';
+import type { ViewMode } from '@/types/downloader';
+
+function DownloaderApp() {
+  const [viewMode, setViewMode] = useState<ViewMode>('explorer');
+
+  return (
+    <div>
+      <nav>
+        <button onClick={() => setViewMode('explorer')}>Explorer</button>
+        <button onClick={() => setViewMode('downloads')}>Downloads</button>
+        <button onClick={() => setViewMode('player')}>Player</button>
+      </nav>
+      
+      {viewMode === 'explorer' && <YouTubeExplorer />}
+      {viewMode === 'downloads' && <DownloadManager />}
+      {viewMode === 'player' && <VideoPlayer />}
+    </div>
+  );
+}
+```
+
+---
+
+## Type Utilities
+
+### Filtering Formats
+
+```tsx
+function getVideoFormats(formats: VideoFormat[]): VideoFormat[] {
+  return formats.filter(f => f.vcodec !== 'none');
+}
+
+function getAudioFormats(formats: VideoFormat[]): VideoFormat[] {
+  return formats.filter(f => f.acodec !== 'none' && f.vcodec === 'none');
+}
+
+function getBestFormat(formats: VideoFormat[], quality: string): VideoFormat | undefined {
+  return formats
+    .filter(f => f.quality === quality && f.vcodec !== 'none')
+    .sort((a, b) => (b.filesize || 0) - (a.filesize || 0))[0];
+}
+```
+
+### Status Helpers
+
+```tsx
+function isActiveDownload(task: DownloadTask): boolean {
+  return ['pending', 'downloading', 'processing'].includes(task.status);
+}
+
+function isCompletedDownload(task: DownloadTask): boolean {
+  return task.status === 'completed';
+}
+
+function hasError(task: DownloadTask): boolean {
+  return task.status === 'error';
+}
+```
+
+### Format Helpers
+
+```tsx
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+}
+
+function formatDuration(seconds: number): string {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hrs > 0) return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+```

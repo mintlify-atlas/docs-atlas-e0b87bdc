@@ -1,0 +1,424 @@
+---
+title: Installation
+description: Detailed installation instructions and configuration options for OfflineTube
+---
+
+This guide provides comprehensive installation instructions for OfflineTube, including system requirements, environment configuration, and verification steps.
+
+## System requirements
+
+Before installing OfflineTube, ensure your system meets these requirements:
+
+### Required software
+
+<AccordionGroup>
+  <Accordion title="Node.js and npm" icon="node-js">
+    - **Node.js**: Version 20 or higher
+    - **npm**: Version 10 or higher
+    
+    Check your versions:
+    ```bash
+    node --version  # Should be v20.x.x or higher
+    npm --version   # Should be 10.x.x or higher
+    ```
+    
+    Download from [nodejs.org](https://nodejs.org/) if needed.
+  </Accordion>
+
+  <Accordion title="Python" icon="python">
+    - **Python**: Version 3.10 or higher
+    - **pip**: Latest version recommended
+    
+    Check your version:
+    ```bash
+    python3 --version  # Should be 3.10.x or higher
+    pip --version
+    ```
+    
+    Download from [python.org](https://www.python.org/) if needed.
+  </Accordion>
+
+  <Accordion title="FFmpeg" icon="video">
+    FFmpeg and ffprobe must be installed and available in your system PATH.
+    
+    Verify installation:
+    ```bash
+    ffmpeg -version
+    ffprobe -version
+    ```
+    
+    **Installation by platform:**
+    
+    <Tabs>
+      <Tab title="macOS">
+        ```bash
+        brew install ffmpeg
+        ```
+      </Tab>
+      
+      <Tab title="Ubuntu/Debian">
+        ```bash
+        sudo apt update
+        sudo apt install ffmpeg
+        ```
+      </Tab>
+      
+      <Tab title="Windows">
+        Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH, or use:
+        ```bash
+        winget install ffmpeg
+        ```
+      </Tab>
+    </Tabs>
+    
+    <Warning>
+    OfflineTube requires ffmpeg for video processing and merging. Downloads will fail without it.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+### Hardware recommendations
+
+- **CPU**: Multi-core processor recommended for faster video processing
+- **RAM**: Minimum 4GB, 8GB or more recommended for handling large video downloads
+- **Storage**: Sufficient disk space for your video library (videos can be several GB each)
+- **Network**: Stable internet connection for downloading YouTube content
+
+## Frontend setup
+
+The frontend is a Next.js application located in the project root.
+
+<Steps>
+  <Step title="Navigate to project root">
+    ```bash
+    cd /path/to/offlinetube
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Install all Node.js dependencies using npm:
+    
+    ```bash
+    npm install
+    ```
+    
+    This installs:
+    - Next.js 16 with App Router
+    - React 19 and React DOM
+    - Tailwind CSS and styling libraries
+    - shadcn/ui components
+    - All other dependencies from `package.json`
+    
+    <Note>
+    The installation may take several minutes depending on your internet connection.
+    </Note>
+  </Step>
+
+  <Step title="Verify installation">
+    Check that the installation completed successfully:
+    
+    ```bash
+    npm run build
+    ```
+    
+    This creates a production build and verifies all dependencies are correctly installed.
+  </Step>
+</Steps>
+
+## Backend setup
+
+The backend is a FastAPI application using yt-dlp for YouTube integration.
+
+<Steps>
+  <Step title="Navigate to backend directory">
+    ```bash
+    cd mini-services/offlinetube-api
+    ```
+  </Step>
+
+  <Step title="Create Python virtual environment">
+    Create an isolated Python environment:
+    
+    <Tabs>
+      <Tab title="macOS/Linux">
+        ```bash
+        python3 -m venv .venv
+        source .venv/bin/activate
+        ```
+      </Tab>
+      
+      <Tab title="Windows">
+        ```bash
+        python -m venv .venv
+        .venv\Scripts\activate
+        ```
+      </Tab>
+    </Tabs>
+    
+    Your prompt should now show `(.venv)` indicating the virtual environment is active.
+  </Step>
+
+  <Step title="Install Python dependencies">
+    With the virtual environment activated, install all backend dependencies:
+    
+    ```bash
+    pip install -r requirements.txt
+    ```
+    
+    This installs:
+    - **FastAPI** (0.109.0): Web framework
+    - **uvicorn** (0.27.0): ASGI server
+    - **yt-dlp** (2024.1.1): YouTube downloader
+    - **python-multipart** (0.0.6): File upload support
+    - **aiofiles** (23.2.1): Async file operations
+    - Additional libraries for async operations and data handling
+  </Step>
+
+  <Step title="Verify directory structure">
+    The backend will automatically create required directories on first run:
+    
+    - `downloads/`: Stores downloaded video and audio files
+    - `thumbnails/`: Caches video thumbnail images locally
+    
+    These directories are created in `mini-services/offlinetube-api/` when the backend starts.
+  </Step>
+</Steps>
+
+## Environment configuration
+
+OfflineTube works out of the box with default settings, but you can customize the backend API URL if needed.
+
+### Frontend environment variables (optional)
+
+The frontend automatically detects the backend URL based on the current host. To override this:
+
+<Steps>
+  <Step title="Create environment file">
+    Create a `.env.local` file in the project root:
+    
+    ```bash
+    touch .env.local
+    ```
+  </Step>
+
+  <Step title="Set API URL">
+    Add the backend URL to `.env.local`:
+    
+    ```env .env.local
+    NEXT_PUBLIC_API_URL=http://localhost:8001
+    ```
+    
+    <Note>
+    The frontend uses this resolution order:
+    1. If `NEXT_PUBLIC_API_URL` is set, use that value
+    2. Otherwise, use `http(s)://<current-host>:8001`
+    </Note>
+  </Step>
+</Steps>
+
+### Backend configuration
+
+The backend runs on `0.0.0.0:8001` by default, configured in `mini-services/offlinetube-api/main.py`:
+
+```python main.py
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)
+```
+
+<Info>
+**Running on 0.0.0.0**: This allows the backend to accept connections from any network interface, enabling LAN access from other devices.
+</Info>
+
+## Running in development
+
+Once installed, you'll need two terminal windows to run OfflineTube:
+
+### Terminal A: Backend server
+
+<Steps>
+  <Step title="Navigate and activate environment">
+    ```bash
+    cd mini-services/offlinetube-api
+    source .venv/bin/activate  # Windows: .venv\Scripts\activate
+    ```
+  </Step>
+
+  <Step title="Start the backend">
+    ```bash
+    python main.py
+    ```
+    
+    Expected output:
+    ```
+    INFO:     Started server process [12345]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+    ```
+  </Step>
+</Steps>
+
+### Terminal B: Frontend server
+
+<Steps>
+  <Step title="Navigate to project root">
+    ```bash
+    cd /path/to/offlinetube
+    ```
+  </Step>
+
+  <Step title="Start the frontend">
+    ```bash
+    npm run dev
+    ```
+    
+    Expected output:
+    ```
+    ▲ Next.js 16.x.x
+    - Local:        http://localhost:3000
+    - Ready in 2.3s
+    ```
+  </Step>
+</Steps>
+
+## Verification steps
+
+Verify your installation is working correctly:
+
+<Steps>
+  <Step title="Check backend health">
+    With the backend running, visit the API documentation:
+    
+    ```
+    http://localhost:8001/docs
+    ```
+    
+    You should see the FastAPI interactive documentation with all available endpoints.
+  </Step>
+
+  <Step title="Test frontend connectivity">
+    Open the frontend in your browser:
+    
+    ```
+    http://localhost:3000
+    ```
+    
+    The OfflineTube interface should load without errors.
+  </Step>
+
+  <Step title="Verify FFmpeg integration">
+    Try searching for and downloading a short video. If the download completes successfully and you can play it back, FFmpeg is working correctly.
+    
+    <Warning>
+    If downloads fail with FFmpeg errors, verify that both `ffmpeg` and `ffprobe` are in your system PATH.
+    </Warning>
+  </Step>
+
+  <Step title="Test file storage">
+    After a successful download, verify files are created:
+    
+    ```bash
+    ls mini-services/offlinetube-api/downloads
+    ls mini-services/offlinetube-api/thumbnails
+    ```
+    
+    You should see your downloaded video and its thumbnail.
+  </Step>
+</Steps>
+
+## Production build
+
+For production deployment, build the frontend:
+
+```bash
+npm run build
+```
+
+This creates an optimized production build with:
+- Standalone server files in `.next/standalone/`
+- Static assets in `.next/static/`
+- Public files copied to the standalone directory
+
+Start the production server:
+
+```bash
+npm run start
+```
+
+This runs the standalone server using Bun for optimal performance.
+
+## Network access (LAN)
+
+To access OfflineTube from other devices on your local network:
+
+<Steps>
+  <Step title="Find your IP address">
+    <Tabs>
+      <Tab title="macOS/Linux">
+        ```bash
+        ifconfig | grep "inet "
+        ```
+      </Tab>
+      
+      <Tab title="Windows">
+        ```bash
+        ipconfig
+        ```
+      </Tab>
+    </Tabs>
+    
+    Look for your local IP address (typically `192.168.x.x` or `10.0.x.x`).
+  </Step>
+
+  <Step title="Ensure backend is accessible">
+    The backend is already configured to run on `0.0.0.0:8001`, which accepts connections from all network interfaces.
+  </Step>
+
+  <Step title="Access from other devices">
+    On another device on the same network, navigate to:
+    
+    ```
+    http://YOUR_IP:3000
+    ```
+    
+    The frontend will automatically detect and connect to `http://YOUR_IP:8001`.
+  </Step>
+
+  <Step title="Check firewall settings">
+    If you can't connect, ensure your firewall allows incoming connections on ports 3000 and 8001.
+  </Step>
+</Steps>
+
+## Available scripts
+
+OfflineTube provides several npm scripts for development and production:
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| **dev** | `npm run dev` | Start Next.js development server on port 3000 with logging |
+| **build** | `npm run build` | Create production build with standalone output |
+| **start** | `npm run start` | Run production server using Bun |
+| **lint** | `npm run lint` | Run ESLint to check code quality |
+
+## Next steps
+
+Your OfflineTube installation is complete! Here are some next steps:
+
+<CardGroup cols={2}>
+  <Card title="API reference" icon="code" href="/api/overview">
+    Learn about the backend API endpoints for advanced usage
+  </Card>
+  
+  <Card title="Environment configuration" icon="gear" href="/configuration/environment-variables">
+    Customize OfflineTube with environment variables and settings
+  </Card>
+  
+  <Card title="Development mode" icon="wrench" href="/deployment/development">
+    Run OfflineTube in development mode with hot reload
+  </Card>
+  
+  <Card title="Network access" icon="network-wired" href="/configuration/network-access">
+    Configure OfflineTube for local network access
+  </Card>
+</CardGroup>

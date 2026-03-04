@@ -1,0 +1,255 @@
+---
+title: "Get Thumbnail"
+api: "GET /api/thumbnails/{task_id}"
+description: "Retrieve locally stored thumbnail images for downloaded videos with automatic format detection"
+---
+
+## Overview
+
+This endpoint serves thumbnail images that were captured during the video download process. Thumbnails are automatically downloaded by yt-dlp and stored locally in the thumbnails directory for fast, reliable access.
+
+## Endpoint
+
+<ParamField path="task_id" type="string" required>
+  The unique identifier of the download task. This is the UUID returned when initiating a download via `POST /api/download`.
+</ParamField>
+
+## Response
+
+### Success (200)
+
+Returns the thumbnail image file with appropriate content type.
+
+<ResponseField name="Content-Type" type="string">
+  The MIME type of the thumbnail image, automatically detected based on file extension:
+  
+  - `image/jpg` - JPEG format (most common)
+  - `image/webp` - WebP format (modern, efficient)
+  - `image/png` - PNG format (lossless)
+</ResponseField>
+
+<ResponseField name="Content-Length" type="integer">
+  Size of the thumbnail image in bytes
+</ResponseField>
+
+<ResponseField name="body" type="binary">
+  The raw image file data
+</ResponseField>
+
+## Supported Formats
+
+The endpoint automatically detects and serves thumbnails in these formats (in order of preference):
+
+1. **JPEG (.jpg)** - Default format from YouTube, typically 1280x720 or 640x480
+2. **WebP (.webp)** - Modern format with better compression
+3. **PNG (.png)** - Lossless format, larger file size
+
+### Format Detection Logic
+
+The server checks for thumbnails in this order:
+
+```python
+for ext in ("jpg", "webp", "png"):
+    thumb = THUMBNAILS_DIR / f"{task_id}.{ext}"
+    if thumb.exists():
+        return FileResponse(thumb, media_type=f"image/{ext}")
+```
+
+The first matching file is returned. This ensures:
+- Fast lookups (typically finds .jpg on first try)
+- Flexibility for different video sources
+- No duplicate storage (only one format per task)
+
+## Thumbnail Creation Process
+
+Thumbnails are created during video download through this workflow:
+
+1. **yt-dlp capture**: The `writethumbnail: True` option tells yt-dlp to download the video's thumbnail
+2. **Move to thumbnails directory**: Downloaded thumbnails are moved from downloads to thumbnails folder
+3. **Fallback download**: If yt-dlp didn't capture a thumbnail, the server downloads it from YouTube's stable thumbnail URLs
+4. **Format normalization**: JPEG extensions are normalized (.jpeg → .jpg)
+
+### Fallback Behavior
+
+If no local thumbnail exists, the API falls back to YouTube's stable thumbnail URLs:
+
+```
+https://i.ytimg.com/vi/{video_id}/hqdefault.jpg
+```
+
+This ensures every video has a thumbnail, even if the local download failed. However, the `/api/thumbnails/{task_id}` endpoint only serves **locally stored** thumbnails.
+
+## Examples
+
+### Basic Request
+
+```bash
+curl http://localhost:8001/api/thumbnails/123e4567-e89b-12d3-a456-426614174000
+```
+
+Response:
+```
+HTTP/1.1 200 OK
+Content-Type: image/jpg
+Content-Length: 48291
+
+[binary JPEG data...]
+```
+
+### Using in HTML
+
+```html
+<img src="http://localhost:8001/api/thumbnails/123e4567-e89b-12d3-a456-426614174000" 
+     alt="Video thumbnail" 
+     width="320" 
+     height="180">
+```
+
+### Embedding in Video Player
+
+```html
+<video controls 
+       poster="http://localhost:8001/api/thumbnails/123e4567-e89b-12d3-a456-426614174000">
+  <source src="/api/stream/video__123e4567-e89b-12d3.mp4" type="video/mp4">
+</video>
+```
+
+### Fetching with JavaScript
+
+```javascript
+const taskId = "123e4567-e89b-12d3-a456-426614174000";
+const thumbnailUrl = `http://localhost:8001/api/thumbnails/${taskId}`;
+
+fetch(thumbnailUrl)
+  .then(response => {
+    if (response.ok) {
+      return response.blob();
+    }
+    throw new Error('Thumbnail not found');
+  })
+  .then(blob => {
+    const imgUrl = URL.createObjectURL(blob);
+    document.getElementById('thumbnail').src = imgUrl;
+  })
+  .catch(error => {
+    console.error('Error loading thumbnail:', error);
+  });
+```
+
+### Conditional Loading with React
+
+```jsx
+function VideoThumbnail({ taskId }) {
+  const [thumbnailUrl, setThumbnailUrl] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const url = `http://localhost:8001/api/thumbnails/${taskId}`;
+    
+    fetch(url)
+      .then(response => {
+        if (response.ok) {
+          setThumbnailUrl(url);
+        } else {
+          setError(true);
+        }
+      })
+      .catch(() => setError(true));
+  }, [taskId]);
+
+  if (error) {
+    return <div>No thumbnail available</div>;
+  }
+
+  return thumbnailUrl ? (
+    <img src={thumbnailUrl} alt="Video thumbnail" />
+  ) : (
+    <div>Loading...</div>
+  );
+}
+```
+
+## Error Responses
+
+<ResponseField name="404" type="error">
+  **Thumbnail not found**
+  
+  No local thumbnail file exists for the specified task_id in any supported format (jpg, webp, png).
+  
+  ```json
+  {
+    "detail": "Miniatura no encontrada"
+  }
+  ```
+  
+  **Common causes**:
+  - Invalid or non-existent task_id
+  - Thumbnail download failed during video processing
+  - Thumbnail was deleted from the thumbnails directory
+  - Download task hasn't completed yet
+</ResponseField>
+
+## File Storage Location
+
+Thumbnails are stored in the server's thumbnails directory:
+
+```
+/path/to/offlinetube-api/thumbnails/
+├── 123e4567-e89b-12d3-a456-426614174000.jpg
+├── 234e5678-f90c-23e4-b567-537725285111.webp
+└── 345f6789-g01d-34f5-c678-648836396222.png
+```
+
+File naming convention: `{task_id}.{ext}`
+
+## Cleanup
+
+Thumbnails are automatically deleted when:
+
+1. **Download removal**: Calling `DELETE /api/downloads/{download_id}/remove` removes both the video file and thumbnail
+2. The cleanup process checks all three formats:
+
+```python
+for ext in ("jpg", "webp", "png"):
+    try:
+        (THUMBNAILS_DIR / f"{download_id}.{ext}").unlink(missing_ok=True)
+    except Exception:
+        pass
+```
+
+## Performance Characteristics
+
+- **Fast serving**: Static files served directly from disk
+- **Small file sizes**: Typically 20-100KB for JPEG thumbnails
+- **No transcoding**: Images are served in their original format
+- **Disk cache friendly**: Frequently accessed thumbnails stay in OS cache
+
+## Best Practices
+
+1. **Check download status first**: Ensure the download task is completed before requesting its thumbnail
+2. **Handle 404s gracefully**: Implement fallback images or placeholders for missing thumbnails
+3. **Cache on client side**: Browser caching significantly reduces server load
+4. **Use task list endpoint**: GET /api/downloads returns thumbnail URLs for all tasks
+5. **Lazy loading**: Load thumbnails only when needed (e.g., when scrolling into view)
+
+## Integration with Download List
+
+The `GET /api/downloads` endpoint returns thumbnail URLs that automatically use this endpoint for local thumbnails:
+
+```json
+{
+  "id": "123e4567-e89b-12d3-a456-426614174000",
+  "title": "Example Video",
+  "thumbnail": "/api/thumbnails/123e4567-e89b-12d3-a456-426614174000",
+  "status": "completed",
+  ...
+}
+```
+
+If no local thumbnail exists, it falls back to a remote URL (e.g., `https://i.ytimg.com/vi/...`).
+
+## Related Endpoints
+
+- [GET /api/downloads](/api/downloads/list-downloads) - List all downloads with thumbnail URLs
+- [DELETE /api/downloads/{download_id}/remove](/api/downloads/remove-download) - Remove download and thumbnail
+- [GET /api/stream/{filename}](/api/streaming/stream-file) - Stream the associated video file

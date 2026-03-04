@@ -1,0 +1,678 @@
+---
+title: Docker Deployment
+description: Deploy OfflineTube using Docker containers with optimized configuration for frontend and backend services
+---
+
+## Overview
+
+OfflineTube can be deployed using Docker containers for easier deployment and isolation. This guide provides production-ready Docker configurations for both the Next.js frontend and FastAPI backend.
+
+<Note>
+The source repository does not include Docker files by default. This guide provides recommended configurations based on the application architecture.
+</Note>
+
+## Architecture
+
+```text
+Docker Network: offlinetube-network
+
+┌─────────────────────────────────────────┐
+│  offlinetube-frontend                   │
+│  Next.js + Bun                          │
+│  Port: 3000                             │
+└─────────────────┬───────────────────────┘
+                  │ HTTP
+                  ▼
+┌─────────────────────────────────────────┐
+│  offlinetube-backend                    │
+│  FastAPI + yt-dlp + FFmpeg              │
+│  Port: 8001                             │
+│  Volumes:                               │
+│    - ./downloads:/app/downloads         │
+│    - ./thumbnails:/app/thumbnails       │
+└─────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+- **Docker** 20.10+
+- **Docker Compose** 2.0+
+
+### Install Docker
+
+```bash
+# Ubuntu/Debian
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+
+# Install Docker Compose
+sudo apt install docker-compose-plugin
+```
+
+## Docker Configuration Files
+
+### Frontend Dockerfile
+
+Create `Dockerfile` in project root:
+
+```dockerfile
+# Build stage
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build application
+RUN npm run build
+
+# Production stage
+FROM oven/bun:1-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Copy standalone output
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/public ./public
+
+USER nextjs
+
+EXPOSE 3000
+
+CMD ["bun", "server.js"]
+```
+
+### Backend Dockerfile
+
+Create `mini-services/offlinetube-api/Dockerfile`:
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify FFmpeg installation
+RUN ffmpeg -version && ffprobe -version
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Upgrade yt-dlp to latest
+RUN pip install --no-cache-dir --upgrade yt-dlp
+
+# Copy application code
+COPY main.py .
+
+# Create directories for downloads and thumbnails
+RUN mkdir -p /app/downloads /app/thumbnails && \
+    chmod 755 /app/downloads /app/thumbnails
+
+# Create non-root user
+RUN useradd -m -u 1001 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8001/api/downloads || exit 1
+
+CMD ["python", "main.py"]
+```
+
+### Docker Compose Configuration
+
+Create `docker-compose.yml` in project root:
+
+```yaml
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: offlinetube-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://backend:8001
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - offlinetube-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  backend:
+    build:
+      context: ./mini-services/offlinetube-api
+      dockerfile: Dockerfile
+    container_name: offlinetube-backend
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./data/downloads:/app/downloads
+      - ./data/thumbnails:/app/thumbnails
+    restart: unless-stopped
+    networks:
+      - offlinetube-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/downloads"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  offlinetube-network:
+    driver: bridge
+
+volumes:
+  downloads:
+  thumbnails:
+```
+
+### Environment Configuration
+
+Create `.env` file for Docker Compose:
+
+```env
+# Frontend
+NEXT_PUBLIC_API_URL=http://localhost:8001
+
+# Backend (if needed for future configuration)
+# BACKEND_HOST=0.0.0.0
+# BACKEND_PORT=8001
+```
+
+## Building and Running
+
+<Steps>
+
+### Create Data Directories
+
+Create directories for persistent data:
+
+```bash
+mkdir -p data/downloads data/thumbnails
+chmod 755 data/downloads data/thumbnails
+```
+
+### Build Images
+
+Build both frontend and backend containers:
+
+```bash
+docker-compose build
+```
+
+**Build output:**
+```
+[+] Building 45.2s (24/24) FINISHED
+ => [frontend internal] load build definition
+ => [backend internal] load build definition
+...
+```
+
+### Start Services
+
+Start containers in detached mode:
+
+```bash
+docker-compose up -d
+```
+
+### Verify Containers Are Running
+
+```bash
+docker-compose ps
+```
+
+Expected output:
+```
+NAME                      STATUS              PORTS
+offlinetube-frontend      Up (healthy)        0.0.0.0:3000->3000/tcp
+offlinetube-backend       Up (healthy)        0.0.0.0:8001->8001/tcp
+```
+
+### View Logs
+
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f frontend
+docker-compose logs -f backend
+```
+
+</Steps>
+
+## Container Management
+
+### Stop Services
+
+```bash
+docker-compose down
+```
+
+### Restart Services
+
+```bash
+docker-compose restart
+
+# Restart specific service
+docker-compose restart backend
+```
+
+### Rebuild After Code Changes
+
+```bash
+# Rebuild and restart
+docker-compose up -d --build
+
+# Rebuild specific service
+docker-compose build frontend
+docker-compose up -d frontend
+```
+
+### Remove Containers and Volumes
+
+```bash
+# Remove containers only
+docker-compose down
+
+# Remove containers and volumes (DELETES DOWNLOADS)
+docker-compose down -v
+```
+
+## Volume Mounts and Data Persistence
+
+### Download Directory
+
+The downloads directory is mounted to persist downloaded videos:
+
+```yaml
+volumes:
+  - ./data/downloads:/app/downloads
+```
+
+**Host path**: `./data/downloads/`
+**Container path**: `/app/downloads/`
+
+### Thumbnails Directory
+
+Cached thumbnails are persisted:
+
+```yaml
+volumes:
+  - ./data/thumbnails:/app/thumbnails
+```
+
+**Host path**: `./data/thumbnails/`
+**Container path**: `/app/thumbnails/`
+
+### Accessing Downloaded Files
+
+Downloaded files are accessible on the host:
+
+```bash
+# List downloads
+ls -lh data/downloads/
+
+# Play video
+mpv data/downloads/video.mp4
+```
+
+### Backup and Restore
+
+```bash
+# Backup downloads
+tar -czf downloads-backup-$(date +%Y%m%d).tar.gz data/downloads/
+
+# Restore downloads
+tar -xzf downloads-backup-20260304.tar.gz
+```
+
+## Port Mappings
+
+### Default Configuration
+
+- **Frontend**: `3000:3000` (host:container)
+- **Backend**: `8001:8001` (host:container)
+
+### Custom Port Mapping
+
+To use different host ports, edit `docker-compose.yml`:
+
+```yaml
+services:
+  frontend:
+    ports:
+      - "8080:3000"  # Access at http://localhost:8080
+  
+  backend:
+    ports:
+      - "8888:8001"  # Backend at http://localhost:8888
+```
+
+Update frontend environment:
+
+```yaml
+environment:
+  - NEXT_PUBLIC_API_URL=http://localhost:8888
+```
+
+## Networking
+
+### Internal Communication
+
+Containers communicate using service names:
+
+- Frontend → Backend: `http://backend:8001`
+- Backend is accessible as `backend` within the Docker network
+
+### External Access
+
+From host machine:
+
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8001`
+- API docs: `http://localhost:8001/docs`
+
+### LAN Access
+
+To access from other devices on your network:
+
+```bash
+# Find host IP
+ip addr show | grep inet
+
+# Access from other device
+http://<host-ip>:3000
+```
+
+Ensure firewall allows connections:
+
+```bash
+sudo ufw allow 3000
+sudo ufw allow 8001
+```
+
+## Resource Limits
+
+Limit container resource usage by adding to `docker-compose.yml`:
+
+```yaml
+services:
+  frontend:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
+  
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          memory: 512M
+```
+
+## Production Optimizations
+
+### Multi-stage Build Optimization
+
+The Dockerfile uses multi-stage builds to minimize image size:
+
+- **Builder stage**: Contains build tools and source code
+- **Runner stage**: Only includes production runtime and built artifacts
+
+### Image Size Comparison
+
+```bash
+# Check image sizes
+docker images | grep offlinetube
+
+# Expected sizes:
+# Frontend: ~150-200 MB
+# Backend: ~800 MB - 1 GB (includes FFmpeg)
+```
+
+### Reducing Backend Image Size
+
+Use Alpine-based Python image (requires compilation):
+
+```dockerfile
+FROM python:3.11-alpine
+
+RUN apk add --no-cache \
+    ffmpeg \
+    gcc \
+    musl-dev \
+    python3-dev \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apk del gcc musl-dev python3-dev
+```
+
+## Monitoring and Debugging
+
+### Container Stats
+
+```bash
+# Real-time resource usage
+docker stats
+
+# Specific container
+docker stats offlinetube-backend
+```
+
+### Execute Commands in Container
+
+```bash
+# Backend shell
+docker exec -it offlinetube-backend /bin/bash
+
+# Check downloads inside container
+docker exec offlinetube-backend ls -lh /app/downloads/
+
+# Test FFmpeg
+docker exec offlinetube-backend ffmpeg -version
+```
+
+### View Container Logs
+
+```bash
+# Last 100 lines
+docker logs --tail 100 offlinetube-backend
+
+# Follow logs
+docker logs -f offlinetube-frontend
+
+# Logs with timestamps
+docker logs -t offlinetube-backend
+```
+
+### Health Checks
+
+```bash
+# Check container health
+docker inspect --format='{{.State.Health.Status}}' offlinetube-backend
+
+# View health check logs
+docker inspect --format='{{range .State.Health.Log}}{{.Output}}{{end}}' offlinetube-backend
+```
+
+## Troubleshooting
+
+### Container Won't Start
+
+**Check logs:**
+```bash
+docker-compose logs backend
+```
+
+**Common issues:**
+- Port already in use: Change port mapping
+- Volume permission issues: `sudo chown -R 1001:1001 data/`
+- Build failures: Check Dockerfile syntax
+
+### FFmpeg Not Found
+
+**Verify FFmpeg in container:**
+```bash
+docker exec offlinetube-backend ffmpeg -version
+```
+
+**Rebuild if missing:**
+```bash
+docker-compose build --no-cache backend
+```
+
+### Frontend Can't Reach Backend
+
+**Check network:**
+```bash
+docker network inspect offlinetube-network
+```
+
+**Test internal connectivity:**
+```bash
+docker exec offlinetube-frontend curl http://backend:8001/api/downloads
+```
+
+**Verify environment variable:**
+```bash
+docker exec offlinetube-frontend env | grep API_URL
+```
+
+### High Disk Usage
+
+**Check volume sizes:**
+```bash
+du -sh data/downloads/
+du -sh data/thumbnails/
+```
+
+**Clean old files:**
+```bash
+# Find files older than 30 days
+find data/downloads/ -mtime +30 -ls
+
+# Delete old files
+find data/downloads/ -mtime +30 -delete
+```
+
+### Permission Errors
+
+**Fix volume permissions:**
+```bash
+sudo chown -R 1001:1001 data/downloads data/thumbnails
+chmod -R 755 data/
+```
+
+## Docker Compose Profiles (Optional)
+
+Use profiles for different deployment scenarios.
+
+Update `docker-compose.yml`:
+
+```yaml
+services:
+  frontend:
+    profiles: ["full", "frontend-only"]
+    # ...
+  
+  backend:
+    profiles: ["full", "backend-only"]
+    # ...
+```
+
+Run specific profiles:
+
+```bash
+# Full stack
+docker-compose --profile full up -d
+
+# Backend only
+docker-compose --profile backend-only up -d
+```
+
+## CI/CD Integration
+
+Example GitHub Actions workflow:
+
+```yaml
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build images
+        run: docker-compose build
+      
+      - name: Run tests
+        run: docker-compose run --rm backend pytest
+      
+      - name: Push to registry
+        run: |
+          docker tag offlinetube-frontend:latest registry.example.com/offlinetube-frontend:latest
+          docker push registry.example.com/offlinetube-frontend:latest
+```
+
+## Next Steps
+
+- Set up reverse proxy with Nginx (see [Production Deployment](/deployment/production))
+- Configure SSL/TLS with Let's Encrypt
+- Set up automated backups for `data/` directory
+- Implement log rotation for container logs
+- Consider orchestration with Kubernetes for scaling

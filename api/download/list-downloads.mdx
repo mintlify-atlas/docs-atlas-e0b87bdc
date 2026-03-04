@@ -1,0 +1,158 @@
+---
+title: "List Downloads"
+api: "GET /api/downloads"
+description: "Retrieves all download tasks with their current status and progress"
+---
+
+## Response
+
+Returns an array of download task objects.
+
+<ResponseField name="id" type="string">
+  Unique identifier for the download task
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The original URL that was requested for download
+</ResponseField>
+
+<ResponseField name="title" type="string">
+  The title of the video/audio (extracted after download starts)
+</ResponseField>
+
+<ResponseField name="thumbnail" type="string">
+  URL or path to the thumbnail image. May be a local API path (`/api/thumbnails/{id}`) or an external URL
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current status of the download. Possible values:
+  - `"pending"` - Queued, not started yet
+  - `"downloading"` - Currently downloading
+  - `"processing"` - Download complete, processing/merging streams
+  - `"completed"` - Fully complete and ready for retrieval
+  - `"error"` - Download failed
+  - `"cancelled"` - User cancelled the download
+</ResponseField>
+
+<ResponseField name="progress" type="number">
+  Download progress percentage (0-100)
+</ResponseField>
+
+<ResponseField name="speed" type="string">
+  Current download speed (e.g., "5.2 MB/s" or "850 KB/s")
+</ResponseField>
+
+<ResponseField name="eta" type="string">
+  Estimated time remaining (e.g., "45s")
+</ResponseField>
+
+<ResponseField name="filesize" type="integer">
+  Total file size in bytes
+</ResponseField>
+
+<ResponseField name="downloaded_bytes" type="integer">
+  Number of bytes downloaded so far
+</ResponseField>
+
+<ResponseField name="format_note" type="string">
+  Actual quality of the downloaded file (e.g., "1080p", "128kbps")
+</ResponseField>
+
+<ResponseField name="is_playlist" type="boolean">
+  Whether the URL is a playlist
+</ResponseField>
+
+<ResponseField name="playlist_index" type="integer">
+  Current video index in playlist (if applicable)
+</ResponseField>
+
+<ResponseField name="playlist_total" type="integer">
+  Total number of videos in playlist (if applicable)
+</ResponseField>
+
+<ResponseField name="filename" type="string">
+  Name of the downloaded file on disk
+</ResponseField>
+
+<ResponseField name="quality" type="string">
+  The requested quality setting (e.g., "720p")
+</ResponseField>
+
+<ResponseField name="download_type" type="string">
+  Type of download: `"video"` or `"audio"`
+</ResponseField>
+
+<ResponseField name="error_message" type="string">
+  Error details if status is `"error"`
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp when the download was initiated
+</ResponseField>
+
+<ResponseField name="completed_at" type="string | null">
+  ISO 8601 timestamp when the download completed, or `null` if not yet completed
+</ResponseField>
+
+## Example Request
+
+```bash cURL
+curl https://your-api.com/api/downloads
+```
+
+## Example Response
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "title": "Rick Astley - Never Gonna Give You Up",
+    "thumbnail": "/api/thumbnails/550e8400-e29b-41d4-a716-446655440000",
+    "status": "completed",
+    "progress": 100,
+    "speed": "",
+    "eta": "",
+    "filesize": 52428800,
+    "downloaded_bytes": 52428800,
+    "format_note": "1080p",
+    "is_playlist": false,
+    "playlist_index": 0,
+    "playlist_total": 1,
+    "filename": "Rick Astley - Never Gonna Give You Up__550e8400-e29b-41d4-a716-446655440000.mp4",
+    "quality": "1080p",
+    "download_type": "video",
+    "error_message": "",
+    "created_at": "2026-03-04T10:30:00.000Z",
+    "completed_at": "2026-03-04T10:35:22.000Z"
+  },
+  {
+    "id": "660f9500-f39c-52e5-b827-557766550111",
+    "url": "https://www.youtube.com/watch?v=example123",
+    "title": "Example Video",
+    "thumbnail": "https://i.ytimg.com/vi/example123/hqdefault.jpg",
+    "status": "downloading",
+    "progress": 45.5,
+    "speed": "3.2 MB/s",
+    "eta": "120s",
+    "filesize": 104857600,
+    "downloaded_bytes": 47710208,
+    "format_note": "720p",
+    "is_playlist": false,
+    "playlist_index": 0,
+    "playlist_total": 1,
+    "filename": "",
+    "quality": "720p",
+    "download_type": "video",
+    "error_message": "",
+    "created_at": "2026-03-04T10:40:00.000Z",
+    "completed_at": null
+  }
+]
+```
+
+## Use Cases
+
+- **Progress Monitoring**: Poll this endpoint to display real-time download progress in your UI
+- **Download History**: View all past and current downloads
+- **Status Checking**: Determine which downloads are complete and ready for retrieval

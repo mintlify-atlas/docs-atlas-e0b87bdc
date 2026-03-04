@@ -1,0 +1,156 @@
+---
+title: Search and Discovery
+description: Find and explore YouTube videos using search and trending features before downloading
+---
+
+## Overview
+
+OfflineTube provides powerful search and discovery tools to help you find videos before downloading them for offline viewing. The YouTube Explorer feature lets you search YouTube, browse trending content, and preview video details without leaving the app.
+
+## Key Features
+
+### YouTube Search
+
+Search for videos directly from the Explorer tab using keywords or by pasting YouTube URLs.
+
+**How to use:**
+1. Navigate to the **Explorer** tab from the main navigation
+2. Enter a search query or paste a YouTube URL in the search bar
+3. Press Enter or click the search button
+4. Browse results with thumbnails, duration, and view counts
+
+**Supported URL formats:**
+- Standard: `https://youtube.com/watch?v=VIDEO_ID`
+- Short: `https://youtu.be/VIDEO_ID`
+- Shorts: `https://youtube.com/shorts/VIDEO_ID`
+- Embedded: `https://youtube.com/embed/VIDEO_ID`
+
+### Trending Videos
+
+When you first open the Explorer, you'll see trending videos automatically loaded from YouTube.
+
+<Info>
+  The trending feed shows up to 20 popular videos and refreshes when you open the Explorer tab.
+</Info>
+
+### Video Preview
+
+Click any video from search results or trending to see detailed information:
+
+- Full title and uploader name
+- View count and duration
+- High-resolution thumbnail
+- Available quality options
+- File size estimates
+- Format details (codec, resolution)
+
+## Behind the Scenes
+
+### Search API Call
+
+When you search, the frontend makes a request to the backend:
+
+```typescript
+// From YouTubeExplorer.tsx:116
+const response = await fetch(
+  `${apiUrl}/api/search?q=${encodeURIComponent(searchQuery)}&max_results=20`
+);
+const data = await response.json();
+setSearchResults(data.results);
+```
+
+### Backend Implementation
+
+The backend uses yt-dlp to search YouTube:
+
+```python
+# From main.py:553
+@app.get("/api/search")
+async def search_videos(q: str, max_results: int = 20):
+    if not q.strip():
+        raise HTTPException(400, "El parámetro 'q' es requerido")
+    
+    # If it looks like a URL, fetch info directly
+    if q.startswith("http"):
+        opts["extract_flat"] = False
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(q, download=False)
+            if info:
+                return {"results": [_fmt_result(info)]}
+    
+    # Otherwise search YouTube
+    search_url = f"ytsearch{max_results}:{q}"
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(search_url, download=False)
+```
+
+### Trending Endpoint
+
+```python
+# From main.py:590
+@app.get("/api/trending")
+async def get_trending(max_results: int = 20):
+    trending_url = "https://www.youtube.com/feed/trending"
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(trending_url, download=False)
+    entries = info.get("entries", []) if info else []
+    results = [_fmt_result(e) for e in entries if e]
+    return {"results": results[:max_results]}
+```
+
+## Configuration
+
+### Search Parameters
+
+- **Max Results**: Default is 20 videos per search
+- **Extract Mode**: Uses `extract_flat: True` for faster searches (metadata only, no full video info)
+
+### Error Handling
+
+The app includes smart error handling:
+
+```typescript
+// From YouTubeExplorer.tsx:123-128
+catch {
+  searchFailCountRef.current += 1;
+  if (searchFailCountRef.current === 1 || searchFailCountRef.current % 10 === 0) {
+    console.warn(`YouTubeExplorer search unavailable (x${searchFailCountRef.current})`);
+  }
+  toast.error('No se pudo buscar: backend no disponible');
+}
+```
+
+This prevents console spam while still alerting users to connection issues.
+
+## Tips and Best Practices
+
+<Tip>
+  **Fast video access**: Paste a direct YouTube URL for instant video info without searching
+</Tip>
+
+<Tip>
+  **Keyboard shortcut**: Press `/` anywhere in the app to focus the search bar (page.tsx:26-39)
+</Tip>
+
+<Warning>
+  Search results are fetched in real-time from YouTube. Make sure your backend server is running on port 8001.
+</Warning>
+
+### Performance Optimization
+
+- Trending videos are loaded once when you open the Explorer tab
+- Search is only triggered when you press Enter or click the search button
+- Failed API calls are throttled to avoid flooding the console (logs only 1st failure and every 10th)
+
+### Mobile Experience
+
+The search interface is fully responsive:
+- Grid layout adapts from 1 to 5 columns based on screen size
+- Touch-friendly cards with proper spacing
+- Mobile-optimized search overlay (Header.tsx:68-105)
+
+## Related Features
+
+- [Download Management](/features/download-management) - Download videos after finding them
+- [Offline Playback](/features/offline-playback) - Watch downloaded videos
+- [Library Management](/features/library-management) - Organize your downloaded content

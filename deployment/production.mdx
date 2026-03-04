@@ -1,0 +1,595 @@
+---
+title: Production Deployment
+description: Build and deploy OfflineTube for production with standalone server and optimized performance
+---
+
+## Overview
+
+OfflineTube uses Next.js standalone output mode for optimized production builds and Bun as the production server runtime. The backend runs as a standalone FastAPI service.
+
+## Production Architecture
+
+```text
+Browser
+   │
+   ▼
+Next.js Standalone (Bun) → Port 3000
+   │
+   ▼ HTTP
+FastAPI Backend → Port 8001
+   ├── downloads/     (media files)
+   └── thumbnails/    (cached images)
+```
+
+## Prerequisites
+
+### System Requirements
+
+- **Node.js** 20+ (for building)
+- **Bun** (for production server)
+- **Python** 3.10+
+- **ffmpeg** and **ffprobe**
+- Sufficient disk space for downloads
+
+### Install Bun
+
+```bash
+# Linux/macOS
+curl -fsSL https://bun.sh/install | bash
+
+# Or using npm
+npm install -g bun
+```
+
+## Building for Production
+
+<Steps>
+
+### Install Dependencies
+
+```bash
+npm install
+```
+
+### Run Production Build
+
+```bash
+npm run build
+```
+
+This command:
+1. Runs `next build` to create optimized production bundle
+2. Copies static assets to standalone directory: `.next/static` → `.next/standalone/.next/`
+3. Copies public files: `public` → `.next/standalone/`
+
+**Build output:**
+```
+Route (app)                              Size     First Load JS
+┌ ○ /                                    ...      ...
+├ ○ /library                             ...      ...
+└ ○ /search                              ...      ...
+
+○  (Static)  prerendered as static content
+```
+
+### Verify Build Artifacts
+
+Ensure these directories exist:
+```bash
+ls -la .next/standalone/
+ls -la .next/standalone/.next/static/
+ls -la .next/standalone/public/
+```
+
+</Steps>
+
+## Backend Production Setup
+
+<Steps>
+
+### Navigate to Backend Directory
+
+```bash
+cd mini-services/offlinetube-api
+```
+
+### Create Production Virtual Environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Configure Production Settings
+
+Edit `main.py` if needed (default settings are production-ready):
+
+```python
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        app,
+        host="0.0.0.0",  # Accept external connections
+        port=8001,
+        reload=False,     # Disable reload in production
+        workers=4         # Optional: multiple workers
+    )
+```
+
+</Steps>
+
+## Running in Production
+
+You need to run both services. Use a process manager like systemd, PM2, or supervisord.
+
+### Option 1: Manual Start (Development/Testing)
+
+<Steps>
+
+### Terminal 1: Start Backend
+
+```bash
+cd mini-services/offlinetube-api
+source .venv/bin/activate
+python main.py
+```
+
+### Terminal 2: Start Frontend
+
+```bash
+npm run start
+```
+
+This runs:
+```bash
+NODE_ENV=production bun .next/standalone/server.js
+```
+
+Output is logged to `server.log`.
+
+</Steps>
+
+### Option 2: Using PM2 (Recommended)
+
+PM2 manages processes, auto-restarts on failure, and handles logs.
+
+<Steps>
+
+### Install PM2
+
+```bash
+npm install -g pm2
+```
+
+### Create PM2 Ecosystem File
+
+Create `ecosystem.config.js` in project root:
+
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: 'offlinetube-frontend',
+      script: 'bun',
+      args: '.next/standalone/server.js',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000
+      },
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      error_file: 'logs/frontend-error.log',
+      out_file: 'logs/frontend-out.log'
+    },
+    {
+      name: 'offlinetube-backend',
+      script: 'mini-services/offlinetube-api/.venv/bin/python',
+      args: 'mini-services/offlinetube-api/main.py',
+      cwd: 'mini-services/offlinetube-api',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      error_file: 'logs/backend-error.log',
+      out_file: 'logs/backend-out.log'
+    }
+  ]
+};
+```
+
+### Start Services with PM2
+
+```bash
+# Create logs directory
+mkdir -p logs
+
+# Start both services
+pm2 start ecosystem.config.js
+
+# View status
+pm2 status
+
+# View logs
+pm2 logs
+
+# Save PM2 configuration
+pm2 save
+
+# Set up PM2 to start on boot
+pm2 startup
+```
+
+### Manage PM2 Services
+
+```bash
+# Restart services
+pm2 restart all
+
+# Stop services
+pm2 stop all
+
+# Monitor in real-time
+pm2 monit
+
+# View specific logs
+pm2 logs offlinetube-frontend
+pm2 logs offlinetube-backend
+```
+
+</Steps>
+
+### Option 3: Systemd Services (Linux)
+
+<Steps>
+
+### Create Frontend Service
+
+Create `/etc/systemd/system/offlinetube-frontend.service`:
+
+```ini
+[Unit]
+Description=OfflineTube Frontend (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/path/to/offlinetube
+Environment="NODE_ENV=production"
+ExecStart=/usr/local/bin/bun .next/standalone/server.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/offlinetube/frontend.log
+StandardError=append:/var/log/offlinetube/frontend-error.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Create Backend Service
+
+Create `/etc/systemd/system/offlinetube-backend.service`:
+
+```ini
+[Unit]
+Description=OfflineTube Backend (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/path/to/offlinetube/mini-services/offlinetube-api
+ExecStart=/path/to/offlinetube/mini-services/offlinetube-api/.venv/bin/python main.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/var/log/offlinetube/backend.log
+StandardError=append:/var/log/offlinetube/backend-error.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Enable and Start Services
+
+```bash
+# Create log directory
+sudo mkdir -p /var/log/offlinetube
+sudo chown www-data:www-data /var/log/offlinetube
+
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Enable services to start on boot
+sudo systemctl enable offlinetube-frontend
+sudo systemctl enable offlinetube-backend
+
+# Start services
+sudo systemctl start offlinetube-frontend
+sudo systemctl start offlinetube-backend
+
+# Check status
+sudo systemctl status offlinetube-frontend
+sudo systemctl status offlinetube-backend
+
+# View logs
+sudo journalctl -u offlinetube-frontend -f
+sudo journalctl -u offlinetube-backend -f
+```
+
+</Steps>
+
+## Environment Configuration
+
+### Frontend Environment Variables
+
+Create `.env.production` in project root:
+
+```env
+# Backend API URL (optional, auto-detected if not set)
+NEXT_PUBLIC_API_URL=http://localhost:8001
+
+# Or for external access
+# NEXT_PUBLIC_API_URL=http://your-server-ip:8001
+```
+
+### Rebuild After Configuration Changes
+
+If you modify environment variables:
+
+```bash
+npm run build
+```
+
+## Reverse Proxy Setup (Optional)
+
+For production, use Nginx or Apache as a reverse proxy.
+
+### Nginx Configuration
+
+Create `/etc/nginx/sites-available/offlinetube`:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # Frontend
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Backend API
+    location /api {
+        proxy_pass http://localhost:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Increase timeouts for downloads
+        proxy_connect_timeout 600;
+        proxy_send_timeout 600;
+        proxy_read_timeout 600;
+        send_timeout 600;
+    }
+
+    # Increase client body size for uploads
+    client_max_body_size 100M;
+}
+```
+
+Enable and restart:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/offlinetube /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+## Directory Structure for Production
+
+```text
+offlinetube/
+├── .next/
+│   └── standalone/              # Production build
+│       ├── server.js            # Entry point for Bun
+│       ├── .next/
+│       │   └── static/          # Static assets
+│       ├── public/              # Public files
+│       └── node_modules/        # Minimal runtime deps
+├── mini-services/
+│   └── offlinetube-api/
+│       ├── main.py              # FastAPI app
+│       ├── .venv/               # Python virtual environment
+│       ├── downloads/           # Downloaded media (grows large)
+│       └── thumbnails/          # Cached thumbnails
+├── logs/                        # Application logs (if using PM2)
+└── ecosystem.config.js          # PM2 configuration
+```
+
+## Performance Considerations
+
+### Disk Space Management
+
+Downloads can consume significant disk space:
+
+```bash
+# Check downloads directory size
+du -sh mini-services/offlinetube-api/downloads/
+
+# Clean up old downloads periodically
+find mini-services/offlinetube-api/downloads/ -mtime +30 -delete
+```
+
+### Memory Usage
+
+- **Frontend**: ~100-200 MB per instance
+- **Backend**: ~200-400 MB (increases during active downloads)
+
+### Concurrent Downloads
+
+The backend handles downloads in background tasks. Monitor memory usage if multiple large downloads run simultaneously.
+
+### FFmpeg Performance
+
+FFmpeg uses significant CPU during video processing. Consider:
+- Limiting concurrent downloads
+- Running on a machine with adequate CPU cores
+
+### Caching and CDN
+
+For static assets, consider:
+- Using a CDN for `_next/static/` files
+- Configuring appropriate cache headers in Nginx
+
+## Security Best Practices
+
+<Warning>
+The default CORS configuration (`allow_origins=["*"]`) is insecure for public-facing deployments.
+</Warning>
+
+### Update CORS Settings
+
+Edit `mini-services/offlinetube-api/main.py`:
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://your-domain.com"],  # Specific domains
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### Firewall Configuration
+
+```bash
+# Only expose Nginx (port 80/443)
+sudo ufw allow 80
+sudo ufw allow 443
+
+# Block direct access to app ports
+sudo ufw deny 3000
+sudo ufw deny 8001
+```
+
+### File Permissions
+
+```bash
+# Restrict access to downloads
+chmod 700 mini-services/offlinetube-api/downloads/
+chmod 700 mini-services/offlinetube-api/thumbnails/
+```
+
+## Monitoring and Logs
+
+### Log Locations
+
+- **PM2**: `logs/frontend-*.log`, `logs/backend-*.log`
+- **Systemd**: `/var/log/offlinetube/`
+- **Manual**: `server.log`, `dev.log`
+
+### Monitor Resource Usage
+
+```bash
+# CPU and memory
+htop
+
+# Disk usage
+df -h
+du -sh mini-services/offlinetube-api/downloads/
+
+# PM2 monitoring
+pm2 monit
+```
+
+### Health Checks
+
+```bash
+# Frontend health
+curl http://localhost:3000
+
+# Backend health
+curl http://localhost:8001/docs
+
+# Test download endpoint
+curl http://localhost:8001/api/downloads
+```
+
+## Troubleshooting
+
+### Build Failures
+
+**Issue**: `npm run build` fails
+
+**Solutions**:
+- Check TypeScript errors (note: `ignoreBuildErrors: true` in config)
+- Ensure all dependencies are installed
+- Clear build cache: `rm -rf .next && npm run build`
+
+### Server Won't Start
+
+**Issue**: Bun server fails to start
+
+**Solutions**:
+```bash
+# Verify standalone directory exists
+ls .next/standalone/server.js
+
+# Check Bun installation
+bun --version
+
+# Run with verbose logging
+DEBUG=* bun .next/standalone/server.js
+```
+
+### Backend Crashes
+
+**Issue**: Python process crashes during downloads
+
+**Solutions**:
+- Check memory usage (downloads are memory-intensive)
+- Verify ffmpeg is working: `ffmpeg -version`
+- Check Python logs for stack traces
+- Update yt-dlp: `pip install -U yt-dlp`
+
+### High Disk Usage
+
+**Issue**: Disk space running out
+
+**Solutions**:
+```bash
+# Clean old downloads
+find mini-services/offlinetube-api/downloads/ -mtime +7 -delete
+
+# Clean thumbnails cache
+rm -rf mini-services/offlinetube-api/thumbnails/*
+
+# Check largest files
+du -ah mini-services/offlinetube-api/downloads/ | sort -rh | head -20
+```
+
+## Next Steps
+
+- See [Docker Deployment](/deployment/docker) for containerized production deployment
+- Set up SSL/TLS with Let's Encrypt for HTTPS
+- Configure automated backups for important data
+- Set up monitoring with tools like Prometheus or DataDog

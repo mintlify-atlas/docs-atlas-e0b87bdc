@@ -1,0 +1,462 @@
+---
+title: Library Management
+description: Search, organize, and manage your offline video collection
+---
+
+## Overview
+
+OfflineTube's library management features help you organize and find videos in your downloaded collection. The library automatically updates as downloads complete and provides powerful search capabilities.
+
+## Library View
+
+The Offline tab (default view) displays your entire video collection:
+
+```typescript
+// From page.tsx:257-262
+const completedDownloads = downloads.filter((d) => d.status === 'completed');
+const filteredLibrary = librarySearch.trim()
+  ? completedDownloads.filter((d) =>
+      (d.title || '').toLowerCase().includes(librarySearch.toLowerCase())
+    )
+  : completedDownloads;
+```
+
+### Grid Display
+
+Videos are shown in a responsive grid layout:
+
+```typescript
+// From page.tsx:441
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-6">
+```
+
+Breakpoints:
+- **< 640px**: 1 column
+- **640px - 1024px**: 2 columns
+- **1024px - 1280px**: 3 columns
+- **1280px - 1536px**: 4 columns
+- **≥ 1536px**: 5 columns
+
+## Search Functionality
+
+### Header Search Bar
+
+Search your library using the persistent search bar in the header:
+
+```typescript
+// From page.tsx:289-298
+<Header 
+  onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+  onBackToHome={handleBackToHome}
+  onSearch={(q) => {
+    setLibrarySearch(q);
+    if (activeTab !== 'player') setActiveTab('player');
+    setViewMode('offline');
+  }}
+  searchQuery={librarySearch}
+/>
+```
+
+### Search Implementation
+
+Client-side filtering for instant results:
+
+```typescript
+// From page.tsx:51-52
+const [librarySearch, setLibrarySearch] = useState('');
+
+// Filter logic (page.tsx:258-262)
+const filteredLibrary = librarySearch.trim()
+  ? completedDownloads.filter((d) =>
+      (d.title || '').toLowerCase().includes(librarySearch.toLowerCase())
+    )
+  : completedDownloads;
+```
+
+### Search Results Display
+
+```typescript
+// From page.tsx:397-406
+<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+  <div>
+    <h2 className="text-white text-lg font-medium">
+      {librarySearch ? `Resultados para "${librarySearch}"` : 'Videos descargados'}
+    </h2>
+    {librarySearch && (
+      <p className="text-[#aaaaaa] text-sm mt-0.5">
+        {filteredLibrary.length} {filteredLibrary.length === 1 ? 'resultado' : 'resultados'}
+      </p>
+    )}
+  </div>
+```
+
+### Clear Search
+
+```typescript
+// From page.tsx:408-416
+{librarySearch && (
+  <Button
+    variant="ghost"
+    onClick={() => setLibrarySearch('')}
+    className="text-[#3ea6ff] hover:text-white text-sm"
+  >
+    Limpiar
+  </Button>
+)}
+```
+
+### Keyboard Shortcut
+
+Press `/` anywhere to focus the search bar:
+
+```typescript
+// From Header.tsx:26-39
+useEffect(() => {
+  const handler = (e: KeyboardEvent) => {
+    if (
+      e.key === '/' &&
+      document.activeElement?.tagName !== 'INPUT' &&
+      document.activeElement?.tagName !== 'TEXTAREA'
+    ) {
+      e.preventDefault();
+      inputRef.current?.focus();
+    }
+  };
+  window.addEventListener('keydown', handler);
+  return () => window.removeEventListener('keydown', handler);
+}, []);
+```
+
+## Auto-Refresh
+
+The library automatically updates as downloads complete:
+
+```typescript
+// From page.tsx:70-105
+const fetchDownloads = useCallback(async (isSilent = false) => {
+  if (!API_URL) {
+    setDownloadsError('API_URL no configurada para cargar descargas');
+    if (!isSilent) setDownloadsLoading(false);
+    return;
+  }
+  
+  if (!isSilent) setDownloadsLoading(true);
+  
+  try {
+    const response = await fetch(`${API_URL}/api/downloads`);
+    if (response.ok) {
+      const data = await response.json();
+      setDownloads(data);
+      setDownloadsError(null);
+      backendFailCount.current = 0;
+    }
+  } catch {
+    // Error handling...
+  } finally {
+    if (!isSilent) setDownloadsLoading(false);
+  }
+}, []);
+
+// Poll every 5 seconds (page.tsx:108-112)
+useEffect(() => {
+  fetchDownloads();
+  const timer = setInterval(() => fetchDownloads(true), 5000);
+  return () => clearInterval(timer);
+}, [fetchDownloads]);
+```
+
+### Backend Downloads Endpoint
+
+```python
+# From main.py:449-451
+@app.get("/api/downloads")
+async def list_downloads():
+    return [task_to_dict(t) for t in downloads.values()]
+```
+
+### Download Task Serialization
+
+```python
+# From main.py:226-248
+def task_to_dict(t: "DownloadTask") -> dict:
+    return {
+        "id": t.id,
+        "url": t.url,
+        "title": t.title,
+        "thumbnail": _get_thumbnail(t),
+        "status": t.status,
+        "progress": t.progress,
+        "speed": t.speed,
+        "eta": t.eta,
+        "filesize": t.filesize,
+        "downloaded_bytes": t.downloaded_bytes,
+        "format_note": t.format_note,
+        "is_playlist": t.is_playlist,
+        "playlist_index": t.playlist_index,
+        "playlist_total": t.playlist_total,
+        "filename": t.filename,
+        "quality": t.quality,
+        "download_type": t.download_type,
+        "error_message": t.error_message,
+        "created_at": t.created_at.isoformat(),
+        "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+    }
+```
+
+## Video Cards
+
+Each video in the library is represented by a VideoCard component:
+
+```typescript
+// From page.tsx:466-475
+<VideoCard
+  key={d.id}
+  video={vid}
+  onClick={() => {
+    handleVideoClick(vid);
+    setViewMode('watch');
+  }}
+/>
+```
+
+### Video Object Construction
+
+```typescript
+// From page.tsx:443-464
+const vid: Video = {
+  id: d.id,
+  title: d.title || 'Descarga',
+  description: '',
+  thumbnail: resolveThumbnail(d.thumbnail || '', API_URL),
+  videoUrl: d.filename
+    ? `${API_URL}/api/stream/${encodeURIComponent(d.filename)}`
+    : `${API_URL}/api/download/${d.id}/file`,
+  qualities: [],
+  subtitles: [],
+  audioTracks: [],
+  chapters: [],
+  duration: '',
+  durationSeconds: 0,
+  views: '',
+  uploadedAt: '',
+  channel: { id: '', name: '', avatar: '', subscribers: '', verified: false },
+  likes: 0,
+  dislikes: 0,
+  category: '',
+  tags: [],
+};
+```
+
+## Empty States
+
+### No Downloads
+
+```typescript
+// From page.tsx:485-500
+<div className="h-[50vh] flex flex-col items-center justify-center text-center gap-4">
+  <div className="w-24 h-24 bg-[#272727] rounded-full flex items-center justify-center">
+    <HardDrive className="h-10 w-10 text-[#717171]" />
+  </div>
+  <div>
+    <h3 className="text-white font-medium text-lg">Sin videos descargados</h3>
+    <p className="text-[#aaaaaa] text-sm mt-1">Los videos que descargues aparecerán aquí</p>
+  </div>
+  <Button
+    onClick={() => setActiveTab('explorer')}
+    className="bg-[#272727] hover:bg-[#3f3f3f] text-white rounded-full px-6 font-medium"
+  >
+    Explorar YouTube
+  </Button>
+</div>
+```
+
+### No Search Results
+
+```typescript
+// From page.tsx:476-483
+<div className="col-span-full py-20 flex flex-col items-center gap-3 text-center">
+  <Search className="h-12 w-12 text-[#717171]" />
+  <p className="text-white font-medium">Sin resultados para &ldquo;{librarySearch}&rdquo;</p>
+  <p className="text-[#aaaaaa] text-sm">Intenta con otro término</p>
+  <Button variant="ghost" className="text-[#3ea6ff]" onClick={() => setLibrarySearch('')}>
+    Ver todos los videos
+  </Button>
+</div>
+```
+
+## Manual Refresh
+
+```typescript
+// From page.tsx:417-424
+<Button
+  variant="ghost"
+  onClick={() => fetchDownloads()}
+  className="text-[#aaaaaa] hover:text-white"
+>
+  Actualizar
+</Button>
+```
+
+## Delete Management
+
+Remove videos from your library via the Downloads tab:
+
+```typescript
+// From page.tsx:233-242
+const handleRemoveDownload = async (id: string) => {
+  try {
+    await fetch(`${API_URL}/api/downloads/${id}/remove`, { method: 'DELETE' });
+    setDownloads((prev) => prev.filter((d) => d.id !== id));
+    toast.info('Descarga eliminada');
+    fetchDownloads(true);
+  } catch (error) {
+    console.error('Error removing download:', error);
+  }
+}
+```
+
+### Backend Delete Implementation
+
+```python
+# From main.py:474-490
+@app.delete("/api/downloads/{download_id}/remove")
+async def remove_download(download_id: str):
+    task = downloads.pop(download_id, None)
+    if not task:
+        raise HTTPException(404, "Descarga no encontrada")
+    # Delete physical file
+    if task.filename:
+        try:
+            (DOWNLOAD_DIR / task.filename).unlink(missing_ok=True)
+        except Exception:
+            pass
+    # Delete thumbnail
+    for ext in ("jpg", "webp", "png"):
+        try:
+            (THUMBNAILS_DIR / f"{download_id}.{ext}").unlink(missing_ok=True)
+        except Exception:
+            pass
+    return {"message": "Descarga eliminada"}
+```
+
+<Warning>
+  Deleting a download removes both the video file and thumbnail permanently. This action cannot be undone.
+</Warning>
+
+## Storage Information
+
+All downloads are stored on the backend server:
+
+```python
+# From main.py:28-32
+BASE_DIR = Path(__file__).parent
+DOWNLOAD_DIR = BASE_DIR / "downloads"
+DOWNLOAD_DIR.mkdir(exist_ok=True)
+THUMBNAILS_DIR = BASE_DIR / "thumbnails"
+THUMBNAILS_DIR.mkdir(exist_ok=True)
+```
+
+### File Naming Convention
+
+```python
+# From main.py:295
+"outtmpl": str(DOWNLOAD_DIR / f"%(title)s__{task.id}.%(ext)s"),
+```
+
+Format: `Video Title__uuid.mp4`
+
+Example: `Amazing Video Tutorial__a1b2c3d4-e5f6-7890-abcd-ef1234567890.mp4`
+
+## Quality Detection
+
+The actual quality is detected after download:
+
+```python
+# From main.py:177-207
+def _detect_real_quality(filepath: Path, download_type: str) -> str:
+    try:
+        if download_type == "audio":
+            cmd = [
+                "ffprobe", "-v", "error",
+                "-select_streams", "a:0",
+                "-show_entries", "stream=bit_rate",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(filepath),
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            value = result.stdout.strip().splitlines()[0] if result.stdout.strip() else ""
+            if value.isdigit():
+                return f"{max(1, int(value) // 1000)}kbps"
+            return "audio"
+        
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=height",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(filepath),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        value = result.stdout.strip().splitlines()[0] if result.stdout.strip() else ""
+        if value.isdigit():
+            return f"{int(value)}p"
+        return "video"
+    except Exception:
+        return ""
+```
+
+This is displayed on video cards and in the Downloads tab.
+
+## Tips and Best Practices
+
+<Tip>
+  **Fast search**: Library search is instant because filtering happens client-side. No network delay.
+</Tip>
+
+<Tip>
+  **Keyboard shortcut**: Press `/` to quickly search your library from anywhere in the app
+</Tip>
+
+<Tip>
+  **Auto-update**: The library refreshes every 5 seconds, so new downloads appear automatically
+</Tip>
+
+### Performance Optimization
+
+The app uses smart polling to avoid excessive API calls:
+
+```typescript
+// Silent refresh every 5s (page.tsx:110)
+const timer = setInterval(() => fetchDownloads(true), 5000);
+```
+
+The `isSilent` parameter prevents loading indicators during background refreshes:
+
+```typescript
+// From page.tsx:77
+if (!isSilent) setDownloadsLoading(true);
+```
+
+### Error Handling
+
+Connection errors are handled gracefully:
+
+```typescript
+// From page.tsx:94-101
+catch {
+  backendFailCount.current++;
+  // Only log first failure and every 10th afterwards
+  if (backendFailCount.current === 1 || backendFailCount.current % 10 === 0) {
+    console.warn(`fetchDownloads – backend unreachable (×${backendFailCount.current})`);
+  }
+  if (!isSilent) {
+    setDownloadsError('API no disponible – asegúrate de que el servidor está corriendo en el puerto 8001');
+  }
+}
+```
+
+## Related Features
+
+- [Offline Playback](/features/offline-playback) - Watch videos from your library
+- [Download Management](/features/download-management) - Add videos to your library
+- [Search and Discovery](/features/search-and-discovery) - Find new videos to download

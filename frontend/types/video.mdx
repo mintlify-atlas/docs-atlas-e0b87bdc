@@ -1,0 +1,511 @@
+---
+title: Video Types
+description: TypeScript interfaces and types for video data and player state
+---
+
+## Overview
+
+The video types define the data structures used by the VideoPlayer component and related features like chapters, subtitles, and quality settings.
+
+**Location**: `/workspace/source/src/types/video.ts`
+
+---
+
+## Video
+
+Main interface representing a video with all its metadata and playback information.
+
+```tsx
+interface Video {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  videoUrl: string;
+  qualities: VideoQuality[];
+  subtitles: SubtitleTrack[];
+  audioTracks: AudioTrack[];
+  chapters?: VideoChapter[];
+  duration: string;
+  durationSeconds: number;
+  views: string;
+  uploadedAt: string;
+  channel: Channel;
+  likes: number;
+  dislikes: number;
+  category: string;
+  tags: string[];
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique identifier for the video.
+</ParamField>
+
+<ParamField path="title" type="string" required>
+  The video title displayed to users.
+</ParamField>
+
+<ParamField path="description" type="string" required>
+  Full video description (can be HTML or plain text).
+</ParamField>
+
+<ParamField path="thumbnail" type="string" required>
+  URL to the video thumbnail image (used for preview and poster).
+</ParamField>
+
+<ParamField path="videoUrl" type="string" required>
+  Primary video URL. Can be:
+  - Direct video file URL (e.g., `/videos/sample.mp4`)
+  - YouTube embed URL (e.g., `https://youtube.com/embed/abc123`)
+</ParamField>
+
+<ParamField path="qualities" type="VideoQuality[]" required>
+  Array of available quality options for the video.
+</ParamField>
+
+<ParamField path="subtitles" type="SubtitleTrack[]" required>
+  Array of available subtitle/caption tracks.
+</ParamField>
+
+<ParamField path="audioTracks" type="AudioTrack[]" required>
+  Array of available audio tracks (for multi-language support).
+</ParamField>
+
+<ParamField path="chapters" type="VideoChapter[]">
+  Optional array of video chapters for timeline navigation.
+</ParamField>
+
+<ParamField path="duration" type="string" required>
+  Human-readable duration (e.g., `"10:30"`, `"1:05:20"`).
+</ParamField>
+
+<ParamField path="durationSeconds" type="number" required>
+  Duration in seconds (e.g., `630` for 10 minutes 30 seconds).
+</ParamField>
+
+<ParamField path="views" type="string" required>
+  View count as a formatted string (e.g., `"1.2M views"`).
+</ParamField>
+
+<ParamField path="uploadedAt" type="string" required>
+  Upload date/time (ISO 8601 or human-readable format).
+</ParamField>
+
+<ParamField path="channel" type="Channel" required>
+  Information about the channel that uploaded the video.
+</ParamField>
+
+<ParamField path="likes" type="number" required>
+  Number of likes.
+</ParamField>
+
+<ParamField path="dislikes" type="number" required>
+  Number of dislikes.
+</ParamField>
+
+<ParamField path="category" type="string" required>
+  Video category (e.g., `"Music"`, `"Education"`).
+</ParamField>
+
+<ParamField path="tags" type="string[]" required>
+  Array of tag strings for the video.
+</ParamField>
+
+### Usage Example
+
+```tsx
+const video: Video = {
+  id: 'abc123',
+  title: 'Introduction to TypeScript',
+  description: 'Learn TypeScript fundamentals in this comprehensive tutorial.',
+  thumbnail: 'https://example.com/thumbnails/abc123.jpg',
+  videoUrl: '/videos/typescript-intro.mp4',
+  qualities: [
+    { label: '1080p', resolution: '1920x1080', bitrate: '6 Mbps', url: '/videos/ts-1080p.mp4', height: 1080 },
+    { label: '720p', resolution: '1280x720', bitrate: '3 Mbps', url: '/videos/ts-720p.mp4', height: 720 },
+  ],
+  subtitles: [
+    { lang: 'en', label: 'English', src: '/subtitles/en.vtt', default: true },
+  ],
+  audioTracks: [
+    { lang: 'en', label: 'English', default: true },
+  ],
+  chapters: [
+    { title: 'Introduction', startTime: 0 },
+    { title: 'Basic Types', startTime: 120 },
+    { title: 'Interfaces', startTime: 300 },
+  ],
+  duration: '15:30',
+  durationSeconds: 930,
+  views: '125K views',
+  uploadedAt: '2024-01-15',
+  channel: {
+    id: 'ch001',
+    name: 'Code Academy',
+    avatar: '/avatars/code-academy.jpg',
+    subscribers: '500K',
+    verified: true,
+  },
+  likes: 5200,
+  dislikes: 45,
+  category: 'Education',
+  tags: ['typescript', 'programming', 'tutorial'],
+};
+```
+
+---
+
+## VideoQuality
+
+Represents a single quality option for video playback.
+
+```tsx
+interface VideoQuality {
+  label: string;
+  resolution: string;
+  bitrate: string;
+  url: string;
+  height: number;
+}
+```
+
+### Fields
+
+<ParamField path="label" type="string" required>
+  Display label (e.g., `"1080p"`, `"720p"`, `"Auto"`).
+</ParamField>
+
+<ParamField path="resolution" type="string" required>
+  Resolution as a string (e.g., `"1920x1080"`, `"1280x720"`).
+</ParamField>
+
+<ParamField path="bitrate" type="string" required>
+  Bitrate as a human-readable string (e.g., `"6 Mbps"`, `"3 Mbps"`).
+</ParamField>
+
+<ParamField path="url" type="string" required>
+  Direct URL to the video file at this quality.
+</ParamField>
+
+<ParamField path="height" type="number" required>
+  Vertical resolution in pixels (e.g., `1080`, `720`).
+</ParamField>
+
+### Example
+
+```tsx
+const qualities: VideoQuality[] = [
+  { label: '4K', resolution: '3840x2160', bitrate: '20 Mbps', url: '/video-4k.mp4', height: 2160 },
+  { label: '1080p', resolution: '1920x1080', bitrate: '6 Mbps', url: '/video-1080p.mp4', height: 1080 },
+  { label: '720p', resolution: '1280x720', bitrate: '3 Mbps', url: '/video-720p.mp4', height: 720 },
+  { label: '480p', resolution: '854x480', bitrate: '1.5 Mbps', url: '/video-480p.mp4', height: 480 },
+];
+```
+
+---
+
+## SubtitleTrack
+
+Represents a subtitle/caption track.
+
+```tsx
+interface SubtitleTrack {
+  lang: string;
+  label: string;
+  src: string;
+  default?: boolean;
+}
+```
+
+### Fields
+
+<ParamField path="lang" type="string" required>
+  Language code (ISO 639-1, e.g., `"en"`, `"es"`, `"fr"`).
+</ParamField>
+
+<ParamField path="label" type="string" required>
+  Display label for the subtitle track (e.g., `"English"`, `"Español"`).
+</ParamField>
+
+<ParamField path="src" type="string" required>
+  URL to the subtitle file (WebVTT format recommended).
+</ParamField>
+
+<ParamField path="default" type="boolean">
+  Whether this track should be enabled by default.
+</ParamField>
+
+### Example
+
+```tsx
+const subtitles: SubtitleTrack[] = [
+  { lang: 'en', label: 'English', src: '/subtitles/en.vtt', default: true },
+  { lang: 'es', label: 'Español', src: '/subtitles/es.vtt' },
+  { lang: 'fr', label: 'Français', src: '/subtitles/fr.vtt' },
+];
+```
+
+---
+
+## AudioTrack
+
+Represents an audio track option (for multi-language videos).
+
+```tsx
+interface AudioTrack {
+  lang: string;
+  label: string;
+  default?: boolean;
+}
+```
+
+### Fields
+
+<ParamField path="lang" type="string" required>
+  Language code (ISO 639-1).
+</ParamField>
+
+<ParamField path="label" type="string" required>
+  Display label for the audio track.
+</ParamField>
+
+<ParamField path="default" type="boolean">
+  Whether this is the default audio track.
+</ParamField>
+
+### Example
+
+```tsx
+const audioTracks: AudioTrack[] = [
+  { lang: 'en', label: 'English', default: true },
+  { lang: 'es', label: 'Español (Spain)' },
+  { lang: 'ja', label: '日本語' },
+];
+```
+
+---
+
+## VideoChapter
+
+Represents a chapter marker in the video timeline.
+
+```tsx
+interface VideoChapter {
+  title: string;
+  startTime: number;
+  thumbnail?: string;
+}
+```
+
+### Fields
+
+<ParamField path="title" type="string" required>
+  Chapter title displayed to users.
+</ParamField>
+
+<ParamField path="startTime" type="number" required>
+  Start time in seconds from the beginning of the video.
+</ParamField>
+
+<ParamField path="thumbnail" type="string">
+  Optional thumbnail image for the chapter.
+</ParamField>
+
+### Example
+
+```tsx
+const chapters: VideoChapter[] = [
+  { title: 'Introduction', startTime: 0, thumbnail: '/chapters/intro.jpg' },
+  { title: 'Setup', startTime: 120 },
+  { title: 'Main Tutorial', startTime: 300 },
+  { title: 'Advanced Topics', startTime: 900 },
+  { title: 'Conclusion', startTime: 1200 },
+];
+```
+
+---
+
+## Channel
+
+Represents the channel/creator of a video.
+
+```tsx
+interface Channel {
+  id: string;
+  name: string;
+  avatar: string;
+  subscribers: string;
+  verified?: boolean;
+}
+```
+
+### Fields
+
+<ParamField path="id" type="string" required>
+  Unique channel identifier.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Channel display name.
+</ParamField>
+
+<ParamField path="avatar" type="string" required>
+  URL to channel avatar/profile image.
+</ParamField>
+
+<ParamField path="subscribers" type="string" required>
+  Subscriber count as formatted string (e.g., `"1.2M"`).
+</ParamField>
+
+<ParamField path="verified" type="boolean">
+  Whether the channel is verified (shows checkmark badge).
+</ParamField>
+
+### Example
+
+```tsx
+const channel: Channel = {
+  id: 'ch_tech_edu',
+  name: 'Tech Education',
+  avatar: '/avatars/tech-edu.jpg',
+  subscribers: '2.5M',
+  verified: true,
+};
+```
+
+---
+
+## PlayerState
+
+Represents the complete state of the video player.
+
+```tsx
+interface PlayerState {
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  isMuted: boolean;
+  playbackRate: number;
+  quality: string;
+  isFullscreen: boolean;
+  isTheater: boolean;
+  isMini: boolean;
+  isLooping: boolean;
+  autoplay: boolean;
+  showSubtitles: boolean;
+  currentSubtitle: string;
+  currentAudio: string;
+  buffered: TimeRanges | null;
+}
+```
+
+### Usage Example
+
+```tsx
+const [playerState, setPlayerState] = useState<PlayerState>({
+  isPlaying: false,
+  currentTime: 0,
+  duration: 0,
+  volume: 1,
+  isMuted: false,
+  playbackRate: 1,
+  quality: '1080p',
+  isFullscreen: false,
+  isTheater: false,
+  isMini: false,
+  isLooping: false,
+  autoplay: false,
+  showSubtitles: true,
+  currentSubtitle: 'en',
+  currentAudio: 'en',
+  buffered: null,
+});
+```
+
+---
+
+## Utility Types
+
+### ViewMode
+
+Defines the different view modes in the application.
+
+```tsx
+type ViewMode = 'home' | 'watch' | 'search' | 'offline';
+```
+
+### PlayerMode
+
+Defines the player display modes.
+
+```tsx
+type PlayerMode = 'normal' | 'theater' | 'fullscreen' | 'mini';
+```
+
+### QueueItem
+
+Represents an item in a playlist queue.
+
+```tsx
+interface QueueItem {
+  video: Video;
+  index: number;
+}
+```
+
+### Comment
+
+Represents a video comment (with nested replies support).
+
+```tsx
+interface Comment {
+  id: string;
+  author: string;
+  avatar: string;
+  text: string;
+  likes: number;
+  timestamp: string;
+  replies?: Comment[];
+}
+```
+
+---
+
+## Type Guards
+
+Create type guards for runtime type checking:
+
+```tsx
+function isVideo(obj: any): obj is Video {
+  return (
+    typeof obj === 'object' &&
+    typeof obj.id === 'string' &&
+    typeof obj.title === 'string' &&
+    typeof obj.videoUrl === 'string'
+  );
+}
+
+function hasChapters(video: Video): video is Video & { chapters: VideoChapter[] } {
+  return Array.isArray(video.chapters) && video.chapters.length > 0;
+}
+```
+
+## Usage in Components
+
+```tsx
+import type { Video, VideoQuality, SubtitleTrack } from '@/types/video';
+
+function VideoCard({ video }: { video: Video }) {
+  return (
+    <div>
+      <img src={video.thumbnail} alt={video.title} />
+      <h3>{video.title}</h3>
+      <p>{video.duration} • {video.views}</p>
+    </div>
+  );
+}
+```
