@@ -1,0 +1,138 @@
+{
+  "projectType": "saas",
+  "projectName": "OfflineTube",
+  "projectDescription": "Web application for searching, downloading, and watching YouTube videos offline with a YouTube-like interface",
+  "theme": "palm",
+  "primaryColor": "#FF0000",
+  "lightColor": "#FF4444",
+  "darkColor": "#CC0000",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/search-and-discovery",
+              "features/download-management",
+              "features/offline-playback",
+              "features/library-management"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment-variables",
+              "configuration/quality-settings",
+              "configuration/network-access"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/development",
+              "deployment/production",
+              "deployment/docker"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Download Endpoints",
+            "pages": [
+              "api/download/start-download",
+              "api/download/list-downloads",
+              "api/download/get-file",
+              "api/download/cancel",
+              "api/download/remove"
+            ]
+          },
+          {
+            "group": "Content Discovery",
+            "pages": [
+              "api/content/search",
+              "api/content/trending",
+              "api/content/video-info"
+            ]
+          },
+          {
+            "group": "Streaming",
+            "pages": [
+              "api/streaming/stream-file",
+              "api/streaming/thumbnails"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Frontend",
+        "groups": [
+          {
+            "group": "Components",
+            "pages": [
+              "frontend/components/video-player",
+              "frontend/components/download-manager",
+              "frontend/components/youtube-explorer"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "frontend/hooks/overview"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "frontend/types/video",
+              "frontend/types/downloader"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "YouTube content search and trending discovery",
+    "Video and audio downloads with quality/format selection",
+    "Offline library with local playback",
+    "HTTP range streaming for smooth playback",
+    "Download task management (list, cancel, delete, retry)",
+    "Local thumbnail caching with automatic fallback",
+    "Responsive UI with light/dark mode support",
+    "FastAPI backend with yt-dlp integration",
+    "Next.js 16 frontend with App Router",
+    "Real-time download progress tracking"
+  ],
+  "publicApiSurface": [
+    "POST /api/download - Start a video/audio download",
+    "GET /api/downloads - List all download tasks",
+    "GET /api/download/{download_id}/file - Download completed file",
+    "DELETE /api/downloads/{download_id} - Cancel download",
+    "DELETE /api/downloads/{download_id}/remove - Remove download and files",
+    "GET /api/stream/{filename} - Stream local video file with range support",
+    "GET /api/thumbnails/{task_id} - Get local thumbnail",
+    "GET /api/search - Search YouTube videos",
+    "GET /api/trending - Get trending videos",
+    "POST /api/info - Get video metadata and available formats"
+  ]
+}
